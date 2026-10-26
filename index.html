@@ -585,7 +585,7 @@ function applyPalette(img){
 /* ---------- the wall: a one-off design for every album, drawn from its cover ----------
    Drawn once per song on a small 320x180 canvas, then stretched to the screen with a
    fine grain on top: cheap for a small computer and smooth on a basic screen. */
-const BW=320, BH=180;
+const BW=320; let BH=180;   // BH follows the screen's shape so circles stay round
 const BG_STYLES=['projection','orbs','bands','beams','rings','field'];
 function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
 function hslRgb(h,s,l){ const k=n=>(n+h*12)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1))); return [f(0)*255,f(8)*255,f(4)*255]; }
@@ -626,10 +626,13 @@ function topCells(a, n){
 }
 
 function drawWall(cv, img, a, style, seed, g){
+  // the canvas covers 108% of the screen (from -4%), so map the record into those coordinates
+  const vw=innerWidth*1.08, vh=innerHeight*1.08;
+  BH=Math.max(90, Math.round(BW*vh/vw)); if(cv.width!==BW) cv.width=BW; if(cv.height!==BH) cv.height=BH;
   const x=cv.getContext('2d'); x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,BW,BH);
   x.globalCompositeOperation='source-over'; x.globalAlpha=1; if('filter' in x) x.filter='none';
   const pr=document.querySelector('.platter').getBoundingClientRect();
-  const rx=(pr.left+pr.width/2-shift)/innerWidth*BW, ry=(pr.top+pr.height/2)/innerHeight*BH, rr=pr.width/2/innerWidth*BW;
+  const rx=(pr.left+pr.width/2-shift+innerWidth*.04)/vw*BW, ry=(pr.top+pr.height/2+innerHeight*.04)/vh*BH, rr=pr.width/2/vw*BW;
   const rnd=(k)=>((Math.imul(seed^(k*2654435761),2246822519)>>>0)%1000)/1000;
   const blur=px=>{ if('filter' in x) x.filter=`blur(${px}px)`; };
   const cover=(size)=>{ const c=document.createElement('canvas'); c.width=c.height=size; c.getContext('2d').drawImage(img,0,0,size,size); return c; };
