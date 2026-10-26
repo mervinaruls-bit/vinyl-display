@@ -558,7 +558,7 @@ async function nextSweep(){
     setReveal(0); $('reveal').hidden=false;
   }
   shown = url;
-  if(pre) applyPalette(pre);
+  if(pre) setTimeout(()=>{ if(shown===url) applyPalette(pre); }, 250);   // a beat after the sweep starts, so the two never compete for the same frame
   const t = snap(), m=$('meta');
   swapping = true; m.classList.add('swap');
   setTimeout(()=>{ writeText(t); m.classList.remove('swap'); swapping=false; flushLyrics(); }, 950);
