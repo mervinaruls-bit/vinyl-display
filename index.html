@@ -623,7 +623,9 @@ function applyPalette(img){
   // the cover itself becomes the light on the wall
   const fn=$(next==='bgA'?'fieldA':'fieldB'), fo=$(next==='bgA'?'fieldB':'fieldA');
   try{ paintWall(fn, img, pk); }catch(e){ console.warn(e); }
-  fn.classList.remove('gone'); fn.classList.add('on'); fo.classList.remove('on');
+  // make the new layer visible at zero first, then fade it in on the next frame (otherwise it pops in at full strength)
+  fn.classList.remove('on'); fn.classList.remove('gone'); void fn.offsetWidth;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fn.classList.add('on'); fo.classList.remove('on'); }));
   clearTimeout(fo._goneT); clearTimeout(fn._goneT); fo._goneT=setTimeout(()=>{ if(!fo.classList.contains('on')) fo.classList.add('gone'); }, 4300);
   bgFront=next;
   document.documentElement.style.setProperty('--glow',p[0]);
