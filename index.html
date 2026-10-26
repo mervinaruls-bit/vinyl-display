@@ -150,6 +150,14 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
 .tclock{align-self:flex-start;margin-top:clamp(16px,3.4vh,42px);padding-top:clamp(12px,2vh,22px);border-top:1px solid rgba(236,230,220,.22);
   display:flex;align-items:baseline;gap:.9em;font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;
   color:var(--paper);opacity:.85;font-variant-numeric:tabular-nums}
+.tstats{margin-top:clamp(18px,3.4vh,40px);display:grid;gap:clamp(8px,1.3vh,14px);transition:opacity 1.2s ease}
+.tstats.fade{opacity:0}
+.tstats .tk{margin:0}
+.tcovers{display:flex;gap:clamp(8px,.9vw,14px)}
+.tcovers img{width:clamp(34px,5.4vh,76px);height:clamp(34px,5.4vh,76px);border-radius:50%;object-fit:cover;
+  box-shadow:3px 5px 12px rgba(8,7,6,.5), 0 0 0 1px rgba(236,230,220,.1)}
+.tnames{margin:0;max-width:46ch;font-size:clamp(13px,1.6vh,22px);line-height:1.45;color:var(--paper);opacity:.72;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tclock #tTime{font-weight:600;letter-spacing:.1em}
 .tclock #tDate::before{content:"·";margin-right:.9em;opacity:.6}
 /* screensaver: after a long rest the piece fades back and a slow-wandering clock takes over */
@@ -349,6 +357,11 @@ body.sleeping .ambient{opacity:.35}
       <p class="tartist" id="tArtist"></p>
       <p class="tfacts" id="tFacts"></p>
       <div class="tclock"><span id="tTime"></span><span id="tDate"></span></div>
+      <div class="tstats" id="tStats" hidden>
+        <p class="tk" id="sKicker"></p>
+        <div class="tcovers" id="sCovers"></div>
+        <p class="tnames" id="sNames"></p>
+      </div>
     </div>
     <div class="liner" id="liner">
       <p class="lk" id="lKicker">From the album</p>
@@ -368,7 +381,7 @@ body.sleeping .ambient{opacity:.35}
 <div class="setup" id="setup" hidden>
   <form class="card" id="setupForm" aria-labelledby="setupTitle">
     <h2 id="setupTitle">Connect Spotify</h2>
-    <p id="setupNote" hidden>One more permission is needed so the frame can show your last played song. Sign in again to allow it.</p>
+    <p id="setupNote" hidden>The frame needs one more Spotify permission for its newer features (last played and your listening stats). Sign in again to allow it.</p>
     <ol>
       <li>In the Spotify Developer Dashboard, open your app and tick <strong>Web API</strong>.</li>
       <li>Add this exact Redirect URI:</li>
@@ -393,7 +406,7 @@ const params = new URLSearchParams(location.search);
 const REDIRECT = location.origin + location.pathname.replace(/index\.html$/,'');   // same address whether or not index.html is typed
 // Spotify sign-in works from your own computer, or from the page's home on GitHub Pages
 const LOCAL = /^(127\.0\.0\.1|\[::1\]|localhost)$/.test(location.hostname) || /\.github\.io$/.test(location.hostname);
-const SCOPES = 'user-read-currently-playing user-read-playback-state user-read-recently-played';
+const SCOPES = 'user-read-currently-playing user-read-playback-state user-read-recently-played user-top-read';
 
 /* one screen each on the final build: ?view=record / ?view=lyrics */
 const view = params.get('view');
@@ -443,7 +456,7 @@ function setTrackUI(){
   document.body.classList.toggle('playing', S.playing);
   // once the record has wound down, swap to the title card; any play brings everything back at once
   if(S.playing){ quietSince=performance.now(); document.body.classList.remove('sleeping'); clearTimeout(stopT); stopT=null; if(document.body.classList.contains('stopped')){ document.body.classList.remove('stopped'); centerCard(); } }
-  else if(!document.body.classList.contains('stopped') && !stopT){ stopT=setTimeout(()=>{ stopT=null; if(!S.playing){ document.body.classList.add('stopped'); centerCard(); } }, 1800); }
+  else if(!document.body.classList.contains('stopped') && !stopT){ stopT=setTimeout(()=>{ stopT=null; if(!S.playing){ document.body.classList.add('stopped'); centerCard(); if(S.mode==='spotify') loadStats(); } }, 1800); }
   $('lDur').textContent = fmt(S.durationMs);
   if(!swapping && S.art===shown) writeText(snap());   // otherwise the text changes with the next sweep
 }
@@ -822,6 +835,7 @@ async function loadLyrics(){
     }
   }catch(e){ rec={offline:true}; }
   if(!rec?.offline) lyricCache.set(key,rec);
+  if(rec?.duration && !S.durationMs && S.trackId===key){ S.durationMs=rec.duration*1000; setTrackUI(); }
   if(S.trackId===key) gateLyrics(rec,key);
 }
 function applyLyrics(rec){
@@ -910,13 +924,46 @@ async function api(path){
   return fetch('https://api.spotify.com/v1'+path,{headers:{Authorization:'Bearer '+t}});
 }
 
+/* ---------- Last.fm: shows what you play in other apps, when Spotify isn't playing ----------
+   Set up once by opening the page with ?lastfm=USERNAME&lfkey=API_KEY (?lastfm=off removes it). */
+if(params.get('lastfm')==='off'){ store.del('ns.lfmUser'); store.del('ns.lfmKey'); }
+else if(params.get('lastfm') && params.get('lfkey')){ store.set('ns.lfmUser',params.get('lastfm')); store.set('ns.lfmKey',params.get('lfkey')); history.replaceState(null,'',location.pathname); }
+let lfm=null;
+const normT=x=>(x||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+async function pollLastfm(){
+  const u=store.get('ns.lfmUser'), k=store.get('ns.lfmKey'); if(!u || !k) return;
+  try{
+    const q=new URLSearchParams({method:'user.getrecenttracks',user:u,api_key:k,format:'json',limit:'1'});
+    const t=(await (await fetch('https://ws.audioscrobbler.com/2.0/?'+q)).json()).recenttracks?.track?.[0];
+    if(t && t['@attr']?.nowplaying==='true'){
+      const artist=t.artist?.['#text']||t.artist?.name||'', id='lfm:'+artist+'|'+t.name;
+      if(!lfm || lfm.id!==id){
+        const c=cleanTitle(t.name,[artist]);
+        let art=(t.image||[]).slice(-1)[0]?.['#text']||null;
+        if(art && art.includes('2a96cbd8b46e442fc41c2b86b821562f')) art=null;      // Last.fm's blank placeholder
+        lfm={id, title:c.title, rawTitle:t.name, tag:c.tag, artist:c.artist, album:t.album?.['#text']||'', art, first:Date.now()};
+      }
+    } else lfm=null;
+  }catch(e){}
+}
+function showLfm(){
+  // Last.fm doesn't report the exact position, so it is counted from when the song was first seen
+  if(S.trackId!==lfm.id){
+    S.fromIdle=false;
+    newTrack({id:lfm.id,title:lfm.title,rawTitle:lfm.rawTitle,tag:lfm.tag,artist:lfm.artist,album:lfm.album,art:lfm.art,dur:0,progress:Date.now()-lfm.first,playing:true});
+    store.set('ns.last',JSON.stringify({id:lfm.id,title:lfm.title,artist:lfm.artist,album:lfm.album,art:lfm.art,dur:0}));
+    loadLyrics();
+  } else { Object.assign(S,{progressMs:Date.now()-lfm.first,stamp:performance.now(),playing:true}); setTrackUI(); }
+}
+pollLastfm(); setInterval(pollLastfm, 10000);
+
 /* ---------- follow Spotify (every 3s; position is smoothed between polls) ---------- */
 let pollTimer=null;
 async function poll(){
   try{
     const r=await api('/me/player/currently-playing?additional_types=track,episode');
     if(r.status===401){ store.del('ns.expires'); }
-    else if(r.status===204){ idle(); status(''); }
+    else if(r.status===204){ if(lfm) showLfm(); else idle(); status(''); }
     else if(!r.ok){
       let m=''; try{ m=(await r.json()).error?.message||''; }catch(_){}
       status(r.status===403 ? 'Spotify refused access. In the Developer Dashboard, add your Spotify email under User Management.' : r.status===429 ? '' : 'Spotify error '+r.status+'. '+m);
@@ -924,6 +971,7 @@ async function poll(){
       status('');
       const j=await r.json(), item=j.item;
       if(!item){ S.playing=j.is_playing; setTrackUI(); }          // DJ voice, ads: keep the last record on
+      else if(!j.is_playing && lfm && normT(lfm.title)!==normT(cleanTitle(item.name,[]).title)){ showLfm(); }   // Spotify paused, another app playing
       else{
         const changed=item.id!==S.trackId || S.fromIdle;   // the 'last played' placeholder never counts as loaded
         const al=item.album||{};
@@ -986,6 +1034,35 @@ function idle(){
   Object.assign(S,{playing:false,trackId:null,title:'',artist:'',album:'',year:'',no:0,of:0,durationMs:0,progressMs:0});
   setArt(null); setTrackUI(); showLiner(''); $('lAlbum').textContent='Nothing on the platter'; $('lKicker').textContent='Waiting';
 }
+/* listening stats for the resting card: top artists this month and recently played albums, taking turns */
+const STATS={top:null, recent:null, at:0, idx:0};
+async function loadStats(){
+  if(Date.now()-STATS.at < 30*60*1000 && (STATS.top||STATS.recent)) return renderStats();
+  STATS.at=Date.now();
+  try{ const r=await api('/me/top/artists?time_range=short_term&limit=6');
+    if(r.ok){ STATS.top=((await r.json()).items||[]).map(a=>({name:a.name, img:(a.images||[]).slice(-1)[0]?.url})).filter(x=>x.name); } }catch(e){}
+  try{ const r=await api('/me/player/recently-played?limit=40');
+    if(r.ok){ const seen=new Set(), out=[];
+      for(const it of (await r.json()).items||[]){ const al=it.track?.album; if(!al || seen.has(al.id)) continue;
+        seen.add(al.id); out.push({name:al.name, img:(al.images||[]).slice(-1)[0]?.url}); if(out.length===6) break; }
+      STATS.recent=out; } }catch(e){}
+  renderStats();
+}
+function renderStats(){
+  const sets=[]; if(STATS.top?.length) sets.push(['Your top artists this month',STATS.top]); if(STATS.recent?.length) sets.push(['Recently played',STATS.recent]);
+  const box=$('tStats'); if(!sets.length){ box.hidden=true; return; }
+  box.hidden=false;
+  const [label,list]=sets[STATS.idx % sets.length];
+  $('sKicker').textContent=label;
+  const c=$('sCovers'); c.textContent='';
+  list.slice(0,6).forEach(x=>{ if(!x.img) return; const im=new Image(); im.alt=''; im.decoding='async'; im.src=x.img; c.appendChild(im); });
+  $('sNames').textContent=list.slice(0,6).map(x=>x.name).join('  ·  ');
+}
+setInterval(()=>{                                        // swap between the two every 20 seconds while resting
+  const box=$('tStats'); if(!document.body.classList.contains('stopped') || box.hidden) return;
+  if(!(STATS.top?.length && STATS.recent?.length)) return;
+  box.classList.add('fade'); setTimeout(()=>{ STATS.idx++; renderStats(); box.classList.remove('fade'); },1200);
+},20000);
 function startSpotify(){ S.mode='spotify'; $('setup').hidden=true; idle(); clearTimeout(pollTimer); poll(); }
 function showSetup(){
   clearTimeout(pollTimer); ['ns.token','ns.refresh','ns.expires'].forEach(store.del);
@@ -1064,7 +1141,7 @@ requestAnimationFrame(frame);
     history.replaceState(null,'',REDIRECT + (view?'?view='+view:''));
   }
   const signedIn = store.get('ns.token')||store.get('ns.refresh');
-  const needsScope = signedIn && !(store.get('ns.scope')||'').includes('user-read-recently-played');
+  const needsScope = signedIn && SCOPES.split(' ').some(x=>!(store.get('ns.scope')||'').includes(x));
   if(LOCAL && signedIn && !needsScope) startSpotify();
   else { showSetup(); if(needsScope) $('setupNote').hidden=false; }
 })();
