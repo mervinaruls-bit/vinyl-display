@@ -625,7 +625,7 @@ function applyPalette(img){
   try{ paintWall(fn, img, pk); }catch(e){ console.warn(e); }
   // make the new layer visible at zero first, then fade it in on the next frame (otherwise it pops in at full strength)
   fn.classList.remove('on'); fn.classList.remove('gone'); void fn.offsetWidth;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fn.classList.add('on'); fo.classList.remove('on'); }));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fn.style.transition=''; fo.style.transition='opacity 2s ease 2s'; fn.style.zIndex=2; fo.style.zIndex=1; fn.classList.add('on'); fo.classList.remove('on'); }));
   clearTimeout(fo._goneT); clearTimeout(fn._goneT); fo._goneT=setTimeout(()=>{ if(!fo.classList.contains('on')) fo.classList.add('gone'); }, 4300);
   bgFront=next;
   document.documentElement.style.setProperty('--glow',p[0]);
@@ -889,7 +889,12 @@ async function loadLyrics(){
     for(const name of [raw, S.title]){
       if(rec) break;
       r=await fetch('https://lrclib.net/api/search?'+new URLSearchParams({track_name:name,artist_name:a}));
-      if(r.ok){ const list=await r.json(); rec=list.find(x=>x.syncedLyrics)||list[0]||null; }
+      if(r.ok){ const list=await r.json(), want=S.durationMs/1000;
+        // pick the version whose length is closest to this recording, otherwise the timing drifts
+        const near=x=>want&&x.duration?Math.abs(x.duration-want):0;
+        const synced=list.filter(x=>x.syncedLyrics).sort((a,b)=>near(a)-near(b))[0];
+        rec = synced && near(synced)<=5 ? synced : (list.find(x=>x.plainLyrics)||list[0]||null);
+        if(rec && rec.syncedLyrics && near(rec)>5) rec={...rec,syncedLyrics:null}; }
       if(name===S.title) break;
     }
   }catch(e){ rec={offline:true}; }
@@ -1020,6 +1025,7 @@ pollLastfm(); setInterval(pollLastfm, 10000);
 let pollTimer=null;
 async function poll(){
   try{
+    const t0=performance.now();
     const r=await api('/me/player/currently-playing?additional_types=track,episode');
     if(r.status===401){ store.del('ns.expires'); }
     else if(r.status===204){ if(lfm) showLfm(); else idle(); status(''); }
@@ -1028,7 +1034,7 @@ async function poll(){
       status(r.status===403 ? 'Spotify refused access. In the Developer Dashboard, add your Spotify email under User Management.' : r.status===429 ? '' : 'Spotify error '+r.status+'. '+m);
     } else {
       status('');
-      const j=await r.json(), item=j.item;
+      const j=await r.json(), item=j.item, sampled=(t0+performance.now())/2;   // Spotify's position was read mid-request
       if(!item){ S.playing=j.is_playing; setTrackUI(); }          // DJ voice, ads: keep the last record on
       else if(!j.is_playing && lfm && normT(lfm.title)!==normT(cleanTitle(item.name,[]).title)){ showLfm(); }   // Spotify paused, another app playing
       else{
@@ -1041,7 +1047,10 @@ async function poll(){
           const {progress,playing,...keep}=t; store.set('ns.last',JSON.stringify(keep));
           if(item.type==='episode') showLiner('Podcast'); else loadLyrics();
         } else {
-          Object.assign(S,{progressMs:j.progress_ms,stamp:performance.now(),playing:j.is_playing}); setTrackUI();
+          const now=performance.now(), truth=j.progress_ms+(j.is_playing?now-sampled:0), diff=truth-posMs();
+          // small differences are Spotify's own jitter: ease towards them so the lyrics never jump; a real seek snaps
+          const pos = (S.playing && j.is_playing && Math.abs(diff)<1500) ? posMs()+diff*0.3 : truth;
+          Object.assign(S,{progressMs:pos,stamp:now,playing:j.is_playing}); setTrackUI();
         }
       }
     }
