@@ -76,7 +76,7 @@ body.bg-drift .surface, body.bg-drift .halo{display:none}
 .dimmer{position:fixed;inset:0;z-index:8;pointer-events:none;background:#0a0908;opacity:0;transition:opacity 90s linear}
 .veil{position:absolute;inset:0;background:linear-gradient(90deg, transparent 38%, rgba(14,12,11,.5) 100%),radial-gradient(ellipse 80% 90% at 50% 50%, rgba(16,14,13,.06), rgba(16,14,13,.5))}
 .stage{position:relative;z-index:1;height:100%;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
-  align-items:center;transform:translate(var(--shift,0px),-3vh);transition:transform 1.8s cubic-bezier(.45,0,.2,1);gap:clamp(56px,min(9vw,15.8vh),260px);padding-block:clamp(40px,8vh,140px);max-width:172vh;margin:0 auto}
+  align-items:center;transform:translate(var(--shift,0px),-3vh);transition:transform 1.8s cubic-bezier(.45,0,.2,1), opacity 4s ease;gap:clamp(56px,min(9vw,15.8vh),260px);padding-block:clamp(40px,8vh,140px);max-width:172vh;margin:0 auto}
 body.only-record .stage, body.only-lyrics .stage{grid-template-columns:1fr}
 body.only-record .words{display:none}
 body.only-lyrics .deck{display:none}
@@ -147,6 +147,20 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
 .tk{margin:0 0 clamp(4px,1vh,16px);font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
 .ttitle{margin:0;font-size:clamp(44px,min(5.8vw,10vh),160px);font-weight:800;line-height:1.02;letter-spacing:-.025em;text-wrap:balance;overflow-wrap:anywhere}
 .tartist{margin:0;font-size:clamp(20px,min(2.2vw,3.9vh),56px);font-weight:400;color:var(--paper);opacity:.72}
+.tclock{margin-top:clamp(18px,4.5vh,56px);display:flex;align-items:baseline;gap:clamp(10px,1.4vw,20px);color:var(--paper);opacity:.55;font-variant-numeric:tabular-nums}
+.tclock #tTime{font-size:clamp(26px,min(3.2vw,5.6vh),88px);font-weight:600;letter-spacing:-.02em}
+.tclock #tDate{font:500 clamp(11px,1.4vh,18px)/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+/* screensaver: after a long rest the piece fades back and a slow-wandering clock takes over */
+.saver{position:fixed;inset:0;z-index:7;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity 3s ease}
+.saver-in{display:grid;justify-items:center;gap:clamp(8px,1.4vh,16px);color:var(--paper);opacity:.5;font-variant-numeric:tabular-nums;
+  transform:translate(var(--sx,0),var(--sy,0));transition:transform 40s ease-in-out;text-shadow:0 2px 24px rgba(10,9,8,.6)}
+.saver #sTime{font-size:clamp(48px,min(9vw,16vh),220px);font-weight:600;letter-spacing:-.03em;line-height:1}
+.saver #sDate{font:500 clamp(12px,1.6vh,22px)/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+body.sleeping .saver{opacity:1;transition-delay:2s}
+body.sleeping .stage{opacity:.1}
+body.sleeping .words, body.sleeping .meta{opacity:0!important;transition:opacity 3s ease}
+body.sleeping .ambient{opacity:.35}
+.ambient{transition:opacity 4s ease}
 .tfacts{margin:clamp(6px,1.4vh,14px) 0 0;font:400 clamp(12px,min(1vw,1.7vh),22px)/1.6 var(--mono);color:var(--dim);letter-spacing:.06em}
 .track{font-size:clamp(22px,min(2.4vw,3.9vh),56px);font-weight:800;letter-spacing:-.01em;text-wrap:balance;margin:0}
 .artist{font-size:clamp(15px,min(1.4vw,2.3vh),32px);color:var(--dim);margin:0}
@@ -181,6 +195,9 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
   font:400 clamp(12px,1.45vh,20px)/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
 .lbar{height:2px;background:rgba(236,230,220,.14);border-radius:2px;overflow:hidden}
 .lbar i{display:block;height:100%;width:100%;background:var(--paper);opacity:.8;transform-origin:left center;transform:scaleX(0)}
+.lbio{margin:clamp(6px,1.4vh,16px) 0 0;max-width:46ch;font-size:clamp(14px,min(1.15vw,2vh),24px);line-height:1.55;color:var(--paper);opacity:.62;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;transition:opacity 1s ease}
+.lbio:empty{display:none}
 .lnote{margin:0;font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);opacity:.7}
 
 .status{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:5;text-align:center;
@@ -329,6 +346,7 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
       <p class="ttitle" id="tTitle">Nothing on the platter</p>
       <p class="tartist" id="tArtist"></p>
       <p class="tfacts" id="tFacts"></p>
+      <div class="tclock"><span id="tTime"></span><span id="tDate"></span></div>
     </div>
     <div class="liner" id="liner">
       <p class="lk" id="lKicker">From the album</p>
@@ -336,10 +354,12 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
       <p class="lfacts" id="lFacts"></p>
       <div class="ltime"><span id="lNow">0:00</span><div class="lbar"><i id="lProg"></i></div><span id="lDur">0:00</span></div>
       <p class="lnote" id="lNote"></p>
+      <p class="lbio" id="lBio"></p>
     </div>
   </section>
 </main>
 
+<div class="saver" id="saver" aria-hidden="true"><div class="saver-in" id="saverIn"><span id="sTime"></span><span id="sDate"></span></div></div>
 <div class="dimmer" id="dimmer" aria-hidden="true"></div>
 <p class="status" id="status" role="status"></p>
 
@@ -420,12 +440,12 @@ let stopT=null;
 function setTrackUI(){
   document.body.classList.toggle('playing', S.playing);
   // once the record has wound down, swap to the title card; any play brings everything back at once
-  if(S.playing){ clearTimeout(stopT); stopT=null; if(document.body.classList.contains('stopped')){ document.body.classList.remove('stopped'); centerCard(); } }
+  if(S.playing){ quietSince=performance.now(); document.body.classList.remove('sleeping'); clearTimeout(stopT); stopT=null; if(document.body.classList.contains('stopped')){ document.body.classList.remove('stopped'); centerCard(); } }
   else if(!document.body.classList.contains('stopped') && !stopT){ stopT=setTimeout(()=>{ stopT=null; if(!S.playing){ document.body.classList.add('stopped'); centerCard(); } }, 1800); }
   $('lDur').textContent = fmt(S.durationMs);
   if(!swapping && S.art===shown) writeText(snap());   // otherwise the text changes with the next sweep
 }
-const snap = () => ({title:S.title, tag:S.tag, artist:S.artist, album:S.album, year:S.year, no:S.no, of:S.of});
+const snap = () => ({title:S.title, tag:S.tag, artist:S.artist, bio:bioCache.get(firstArtist(S.artist))||'', album:S.album, year:S.year, no:S.no, of:S.of});
 function writeText(t){
   $('track').textContent = t.title || 'Nothing on the platter';
   $('artist').textContent = t.artist || 'Waiting for Spotify';
@@ -439,6 +459,7 @@ function writeText(t){
   $('tTitle').textContent = t.title || 'Nothing on the platter';
   $('tArtist').textContent = t.artist || '';
   $('tFacts').textContent = [t.tag, t.album, t.year].filter(Boolean).join('  ·  ');
+  $('lBio').textContent = t.bio || '';
   if(document.body.classList.contains('stopped')) requestAnimationFrame(centerCard);
 }
 let linerLast='', linerT=0;
@@ -757,7 +778,31 @@ function flushLyrics(){
   const p=pendingLyrics; if(!p || p.key!==S.trackId) return;
   pendingLyrics=null; applyLyrics(p.rec); $('words').classList.remove('between');
 }
+/* a short artist note from Wikipedia, for instrumentals and songs without lyrics */
+const bioCache=new Map();
+const firstArtist=a=>(a||'').split(',')[0].trim();
+async function loadBio(){
+  const name=firstArtist(S.artist); if(!name || bioCache.has(name)) return;
+  bioCache.set(name,'');
+  try{
+    const q=new URLSearchParams({action:'query',list:'search',srsearch:`${name} musician OR band OR singer OR rapper`,srlimit:'3',format:'json',origin:'*'});
+    const hits=(await (await fetch('https://en.wikipedia.org/w/api.php?'+q)).json()).query?.search||[];
+    for(const h of hits){
+      const sum=await (await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(h.title.replace(/ /g,'_')))).json();
+      const desc=((sum.description||'')+' '+(sum.extract||'').slice(0,200)).toLowerCase();
+      const nameOk=(sum.title||'').toLowerCase().includes(name.toLowerCase().split(' ')[0]);
+      if(nameOk && /singer|rapper|musician|band|group|songwriter|producer|dj|duo|composer|vocalist|record/.test(desc) && sum.extract){
+        let t=sum.extract.split(/(?<=[.!?])\s+/).slice(0,2).join(' ');
+        if(t.length>260) t=t.slice(0,257).replace(/\s+\S*$/,'')+'…';
+        bioCache.set(name,t);
+        if(firstArtist(S.artist)===name && S.art===shown && !swapping) $('lBio').textContent=t;
+        return;
+      }
+    }
+  }catch(e){}
+}
 async function loadLyrics(){
+  loadBio();
   const key=S.trackId; if(!key) return;
   $('words').classList.add('between');
   if(lyricCache.has(key)) return gateLyrics(lyricCache.get(key),key);
@@ -968,6 +1013,22 @@ function dimLevel(){
   return lvl;
 }
 function applyDim(){ $('dimmer').style.opacity = dimLevel().toFixed(3); }
+/* clock on the resting card and the screensaver; the screensaver starts after 15 quiet minutes */
+const SAVER_MS = params.has('saver') ? 8000 : 15*60*1000;
+function tickClock(){
+  const d=new Date();
+  const time=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const date=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  for(const [a,b] of [['tTime','tDate'],['sTime','sDate']]){ if($(a).textContent!==time) $(a).textContent=time; if($(b).textContent!==date) $(b).textContent=date; }
+  if(S.playing) quietSince=performance.now();
+  const sleep = !S.playing && performance.now()-quietSince > SAVER_MS;
+  if(sleep!==document.body.classList.contains('sleeping')) document.body.classList.toggle('sleeping',sleep);
+  if(sleep && d.getSeconds()<6){                         // wander to a new spot once a minute, so nothing sits still for hours
+    const r=()=>((Math.random()*2-1)*18).toFixed(1)+'vh';
+    $('saverIn').style.setProperty('--sx',r()); $('saverIn').style.setProperty('--sy',r());
+  }
+}
+tickClock(); setInterval(tickClock, 5000);
 applyDim(); setInterval(applyDim, 30000);
 async function keepAwake(){ try{ await navigator.wakeLock?.request('screen'); }catch(e){} }
 keepAwake(); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) keepAwake(); });
