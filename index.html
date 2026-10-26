@@ -1,0 +1,977 @@
+<meta charset="utf-8">
+<title>Now Spinning</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the record on the left, lyrics or liner notes on the right. No controls: Spotify is driven from a phone. Dark by design. */
+:root{
+  --room:#100e0d;        /* wall behind the frame */
+  --vinyl:#0e0e0f;       /* record black, kept off true black so the LCD doesn't glow grey around it */
+  --paper:#ece6dc;       /* lyric text */
+  --dim:#8a8279;         /* past/future lyric lines, captions */
+  --glow:#c86a3c;        /* replaced live by the album's colour */
+  --display:"Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--room);color:var(--paper);font-family:var(--display);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  overflow:hidden}
+body.idle{cursor:none}
+/* background: soft light taken from the album cover, cross-fading between tracks */
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bgl{position:absolute;inset:0;opacity:0;transition:opacity 4s ease}
+.bgl.on{opacity:1}
+.bgl i{position:absolute;width:90vmax;height:90vmax;border-radius:50%;will-change:transform}
+.bgl i:nth-child(1){left:-30vmax;top:-25vmax;background:radial-gradient(circle, var(--a) 0, transparent 62%);animation:driftA 46s ease-in-out infinite alternate}
+.bgl i:nth-child(2){right:-35vmax;top:-30vmax;background:radial-gradient(circle, var(--b) 0, transparent 62%);animation:driftB 58s ease-in-out infinite alternate}
+.bgl i:nth-child(3){left:10vmax;bottom:-45vmax;background:radial-gradient(circle, var(--c) 0, transparent 62%);animation:driftC 52s ease-in-out infinite alternate}
+@keyframes driftA{to{transform:translate(18vmax,12vmax) scale(1.1)}}
+@keyframes driftB{to{transform:translate(-14vmax,16vmax) scale(.92)}}
+@keyframes driftC{to{transform:translate(12vmax,-14vmax) scale(1.08)}}
+/* default background: the album's own colours, thrown like light onto a dark wall from behind
+   the record and slowly swirling. The wall itself takes a deep tint of the cover.
+   Built from a tiny, pre-smoothed copy of the cover, so it is cheap for a small computer. */
+.surface{position:absolute;inset:0;background:
+  radial-gradient(70% 85% at 14% -6%, rgba(255,232,200,.06), transparent 70%),
+  linear-gradient(180deg, transparent 55%, rgba(8,7,6,.35) 100%),
+  var(--wall,#151311);transition:background-color 4s ease}
+.field{position:absolute;left:-4%;top:-4%;width:108%;height:108%;
+  opacity:0;transition:opacity 4s ease;pointer-events:none;
+  animation:swirl 80s ease-in-out infinite alternate;will-change:transform}
+.field.on{opacity:var(--fieldop,.5)}
+@keyframes swirl{from{transform:translate(-1.2%,.8%) scale(1)}to{transform:translate(1.2%,-.8%) scale(1.05)}}
+body:not(.bg-drift) .halo{display:none}
+body.bg-drift .field{display:none}
+/* low, cloudy mottling like hand-finished plaster */
+.surface::after{content:"";position:absolute;inset:0;opacity:.5;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='1000' preserveAspectRatio='none'%3E%3Cfilter id='p' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0045' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='1600' height='1000' filter='url(%23p)'/%3E%3C/svg%3E");
+  background-size:100% 100%;background-repeat:no-repeat}
+.halo{position:absolute;left:calc(var(--hx,30vw) + var(--shift,0px));top:var(--hy,50%);width:var(--hs,1200px);height:var(--hs,1200px);margin:calc(var(--hs,1200px) / -2) 0 0 calc(var(--hs,1200px) / -2);
+  border-radius:50%;pointer-events:none;opacity:0;transition:opacity 4s ease, left 1.8s cubic-bezier(.45,0,.2,1);
+  background:radial-gradient(closest-side,
+    var(--a) 0%, var(--a) 50%,
+    color-mix(in srgb, var(--a) 60%, transparent) 57%,
+    color-mix(in srgb, var(--b) 34%, transparent) 69%,
+    color-mix(in srgb, var(--c) 12%, transparent) 84%,
+    transparent 100%);
+  animation:breathe 14s ease-in-out infinite alternate}
+.halo.on{opacity:.55}
+@keyframes wobble{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+@keyframes breathe{from{transform:scale(.97)}to{transform:scale(1.03)}}
+body:not(.bg-drift) .bgl{display:none}
+body.bg-drift .surface, body.bg-drift .halo{display:none}
+.grain{position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E")}
+/* a touch of the same grain on the record surface itself */
+.spin::after{content:"";position:absolute;inset:0;border-radius:50%;opacity:.06;mix-blend-mode:overlay;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+/* evening dimming: the whole piece settles down at night and when nothing is playing */
+.dimmer{position:fixed;inset:0;z-index:8;pointer-events:none;background:#0a0908;opacity:0;transition:opacity 90s linear}
+.veil{position:absolute;inset:0;background:linear-gradient(90deg, transparent 38%, rgba(14,12,11,.5) 100%),radial-gradient(ellipse 80% 90% at 50% 50%, rgba(16,14,13,.06), rgba(16,14,13,.5))}
+.stage{position:relative;z-index:1;height:100%;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
+  align-items:center;transform:translate(var(--shift,0px),-3vh);transition:transform 1.8s cubic-bezier(.45,0,.2,1);gap:clamp(56px,min(9vw,15.8vh),260px);padding-block:clamp(40px,8vh,140px);max-width:172vh;margin:0 auto}
+body.only-record .stage, body.only-lyrics .stage{grid-template-columns:1fr}
+body.only-record .words{display:none}
+body.only-lyrics .deck{display:none}
+
+/* ---------- turntable ---------- */
+.deck{display:flex;justify-content:flex-end;min-width:0}
+.unit{position:relative;width:min(84%, 64vh)}
+.platter{position:relative;width:100%;aspect-ratio:1;max-width:100%;isolation:isolate}
+/* lighting: one soft lamp above-left of the frame. Shadows fall down-right; highlights face up-left. */
+.disc{position:absolute;inset:0;border-radius:50%;background:var(--vinyl);
+  box-shadow:14px 26px 60px rgba(8,7,6,.62), 4px 8px 14px rgba(8,7,6,.45)}
+/* gloss on the record's outer edge, brightest where it faces the lamp */
+.disc::after{content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg, rgba(255,255,255,.04) 0deg, rgba(255,255,255,.04) 250deg, rgba(255,255,255,.30) 315deg, rgba(255,255,255,.04) 360deg);
+  -webkit-mask:radial-gradient(circle, transparent 96.2%, #000 96.8%, #000 99.4%, transparent 100%);
+          mask:radial-gradient(circle, transparent 96.2%, #000 96.8%, #000 99.4%, transparent 100%)}
+.spin{position:absolute;inset:0;border-radius:50%;overflow:hidden;will-change:transform}
+.spin img{position:absolute;inset:3.5%;width:93%;height:93%;border-radius:50%;object-fit:cover;max-width:none}
+.grooves{position:absolute;inset:0;border-radius:50%;
+  background:
+    radial-gradient(circle, transparent 90%, rgba(10,9,8,.18) 93.5%, transparent 96%),
+    radial-gradient(circle closest-side, transparent 57.4%, rgba(10,9,8,.22) 58%, transparent 58.7%),
+    radial-gradient(circle closest-side, transparent 66.6%, rgba(10,9,8,.22) 67.2%, transparent 67.9%),
+    radial-gradient(circle closest-side, transparent 75.6%, rgba(10,9,8,.22) 76.2%, transparent 76.9%),
+    radial-gradient(circle closest-side, transparent 84.4%, rgba(10,9,8,.22) 85%, transparent 85.7%),
+    radial-gradient(circle closest-side, transparent 11%, rgba(10,9,8,.16) 12%, rgba(10,9,8,.16) 16.5%, transparent 17.5%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 1.6px, rgba(10,9,8,.075) 1.6px 2.3px);mix-blend-mode:multiply}
+.sheen{position:absolute;inset:0;border-radius:50%;pointer-events:none;mix-blend-mode:screen;
+  background:
+    radial-gradient(circle, rgba(255,255,255,.05) 0 6%, transparent 30%),
+    radial-gradient(circle closest-side, transparent 58.1%, rgba(255,255,255,.05) 58.5%, transparent 59%),
+    radial-gradient(circle closest-side, transparent 67.3%, rgba(255,255,255,.05) 67.7%, transparent 68.2%),
+    radial-gradient(circle closest-side, transparent 76.3%, rgba(255,255,255,.05) 76.7%, transparent 77.2%),
+    radial-gradient(circle closest-side, transparent 85.1%, rgba(255,255,255,.05) 85.5%, transparent 86%),
+    conic-gradient(from 0deg,
+      transparent 0deg 96deg, rgba(255,255,255,.05) 116deg, rgba(255,255,255,.11) 135deg, rgba(255,255,255,.05) 154deg, transparent 174deg 276deg,
+      rgba(255,255,255,.09) 295deg, rgba(255,255,255,.22) 315deg, rgba(255,255,255,.09) 335deg, transparent 354deg);
+  animation:wobble 11s ease-in-out infinite alternate;
+  -webkit-mask:radial-gradient(circle, transparent 6%, #000 12%, #000 92%, transparent 97%);
+          mask:radial-gradient(circle, transparent 6%, #000 12%, #000 92%, transparent 97%)}
+.spindle{position:absolute;left:50%;top:50%;width:3.4%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle at 35% 35%, #8d8a86, #2c2a28 60%, #0c0b0a);box-shadow:0 0 0 5px rgba(10,9,8,.5), 2px 3px 4px rgba(8,7,6,.6)}
+.arm{position:absolute;right:-4%;top:-14.8%;width:44%;pointer-events:none;overflow:visible}
+.arm .swing{transform-box:view-box;transform-origin:156px 76px;transform:rotate(-36deg);transition:transform 1.6s cubic-bezier(.45,0,.2,1)}
+body.playing .arm .swing{transform:rotate(0deg)}
+
+
+.meta{position:absolute;top:calc(100% + clamp(18px,3vh,30px));left:0;right:0;text-align:center;display:grid;gap:6px;transition:opacity .9s ease}
+.meta.swap{opacity:0}
+/* a soft shadow keeps text readable over any album's light */
+.meta, .tcard, .liner, .lyrics{text-shadow:0 1px 2px rgba(10,9,8,.35), 0 2px 18px rgba(10,9,8,.55)}
+body.stopped .meta{opacity:0}
+.tcard{position:absolute;inset:0 var(--rgap) 0 0;display:flex;flex-direction:column;justify-content:center;gap:clamp(10px,1.8vh,18px);
+  opacity:0;transition:opacity 1.4s ease;pointer-events:none}
+body.stopped .tcard{opacity:1}
+body.stopped .lyrics, body.stopped .liner{opacity:0!important}
+.tk{margin:0 0 clamp(4px,1vh,16px);font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.ttitle{margin:0;font-size:clamp(44px,min(5.8vw,10vh),160px);font-weight:800;line-height:1.02;letter-spacing:-.025em;text-wrap:balance;overflow-wrap:anywhere}
+.tartist{margin:0;font-size:clamp(20px,min(2.2vw,3.9vh),56px);font-weight:400;color:var(--paper);opacity:.72}
+.tfacts{margin:clamp(6px,1.4vh,14px) 0 0;font:400 clamp(12px,min(1vw,1.7vh),22px)/1.6 var(--mono);color:var(--dim);letter-spacing:.06em}
+.track{font-size:clamp(22px,min(2.4vw,3.9vh),56px);font-weight:800;letter-spacing:-.01em;text-wrap:balance;margin:0}
+.artist{font-size:clamp(15px,min(1.4vw,2.3vh),32px);color:var(--dim);margin:0}
+.tag{margin:2px 0 0;font:500 clamp(11px,1.33vh,18px)/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);opacity:.8}
+.tag:empty{display:none}
+
+/* ---------- lyrics / liner notes ---------- */
+.words{--rgap:clamp(24px,min(6vw,10.5vh),200px);position:relative;height:var(--rec,64vh);min-width:0;margin-top:0}
+.lyrics{position:absolute;inset:0 var(--rgap) 0 0;overflow:hidden;transition:opacity 1.2s ease;
+  -webkit-mask-image:linear-gradient(transparent, #000 22%, #000 78%, transparent);
+          mask-image:linear-gradient(transparent, #000 22%, #000 78%, transparent)}
+.sheet{position:absolute;left:0;right:0;top:0;transition:transform 1.2s cubic-bezier(.22,.61,.36,1), opacity .7s ease}
+.sheet.fade{opacity:0}
+.line{font-size:clamp(21px,min(2.3vw,4vh),64px);font-weight:600;line-height:1.22;letter-spacing:-.01em;color:var(--dim);
+  padding:10px 0;opacity:.4;transition:color 1s ease,opacity 1s ease,transform 1.2s cubic-bezier(.22,.61,.36,1),filter 1s ease;transform-origin:left center;text-wrap:balance;filter:blur(.4px)}
+.line.past{opacity:.22;filter:blur(.8px)}
+.line.now{color:var(--paper);opacity:1;transform:scale(1.03);filter:none}
+.sheet.plain .line{opacity:.85;color:var(--paper);font-size:clamp(18px,2vw,26px)}
+
+.liner{position:absolute;inset:0 var(--rgap) 0 0;display:flex;flex-direction:column;justify-content:center;gap:clamp(12px,2vh,20px);transition:opacity 1.2s ease}
+.words.has-lyrics .liner{opacity:0}
+.words:not(.has-lyrics) .lyrics{opacity:0}
+/* a long instrumental intro shows the liner notes until the first line is close */
+.words.has-lyrics.intro .liner{opacity:1}
+.words.has-lyrics.intro .lyrics{opacity:0}
+/* between songs: nothing on the right until the new record has swapped in */
+.words.between .lyrics, .words.between .liner{opacity:0!important}
+.lk{margin:0;font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.lalbum{margin:0;font-size:clamp(34px,min(4.6vw,8vh),120px);font-weight:800;line-height:1;letter-spacing:-.025em;text-wrap:balance;overflow-wrap:anywhere}
+.lfacts{margin:0;font:400 clamp(13px,min(1.1vw,1.85vh),24px)/1.6 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.ltime{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:clamp(14px,1.7vh,24px);max-width:62vh;
+  font:400 clamp(12px,1.45vh,20px)/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.lbar{height:2px;background:rgba(236,230,220,.14);border-radius:2px;overflow:hidden}
+.lbar i{display:block;height:100%;width:0;background:var(--paper);opacity:.8}
+.lnote{margin:0;font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);opacity:.7}
+
+.status{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:5;text-align:center;
+  font:500 12px/1.4 var(--mono);color:#e6b07a;padding-inline:max(16px, env(safe-area-inset-left, 0px))}
+
+/* ---------- one-time setup (only on the device, only when signed out) ---------- */
+.setup{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(8,7,6,.86);cursor:auto;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.card{background:#1a1816;border:1px solid rgba(236,230,220,.12);border-radius:18px;padding:28px;max-width:520px;width:100%;box-sizing:border-box;display:grid;gap:14px}
+.card h2{margin:0;font-size:24px;font-weight:800}
+.card p,.card li{margin:0;color:#c9c1b6;line-height:1.55;font-size:15px}
+.card ol{margin:0;padding-left:20px;display:grid;gap:6px}
+.uri{display:block;font-family:var(--mono);font-size:12.5px;background:#0f0e0d;border-radius:6px;padding:10px;word-break:break-all;user-select:all}
+.card label{font:500 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.card input{font:15px var(--mono);padding:12px;border-radius:10px;border:1px solid rgba(236,230,220,.2);background:#0f0e0d;color:var(--paper);width:100%;box-sizing:border-box}
+.btn{font:500 13px/1 var(--mono);letter-spacing:.04em;color:var(--room);background:var(--paper);border:0;border-radius:99px;padding:12px 18px;cursor:pointer;justify-self:start}
+.btn:focus-visible,.card input:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
+
+@media (max-width:860px){
+  body{overflow-y:auto}
+  .stage{grid-template-columns:1fr;height:auto;min-height:100%;padding-block:56px 48px}
+  .deck{justify-content:center}
+  .unit{width:min(78%,400px)}
+  .words{height:46vh}
+  .stage{transform:none;padding-bottom:120px}
+  .unit{margin-bottom:80px}
+}
+@media (prefers-reduced-motion:reduce){ .sheet,.arm .swing,.line{transition:none} .bgl i,.halo,.sheen,.field{animation:none} }
+</style>
+
+<div class="ambient" aria-hidden="true">
+  <div class="surface"></div>
+  <canvas class="field" id="fieldA" width="320" height="180"></canvas>
+  <canvas class="field" id="fieldB" width="320" height="180"></canvas>
+  <div class="halo" id="haloA"></div>
+  <div class="halo" id="haloB"></div>
+  <div class="bgl" id="bgA"><i></i><i></i><i></i></div>
+  <div class="bgl" id="bgB"><i></i><i></i><i></i></div>
+  <div class="veil"></div>
+  <div class="grain"></div>
+</div>
+
+<main class="stage">
+  <section class="deck" aria-label="Now playing">
+    <div class="unit">
+      <div class="platter">
+        <div class="disc"></div>
+        <div class="spin" id="spin">
+          <img id="artOld" alt="">
+          <img id="art" alt="">
+          <div class="grooves"></div>
+        </div>
+        <div class="sheen"></div>
+        <div class="spindle"></div>
+        <svg class="arm" viewBox="0 0 200 300" aria-hidden="true">
+          <defs>
+            <linearGradient id="gTube" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#0b0b0c"/><stop offset=".28" stop-color="#1f1f21"/>
+              <stop offset=".42" stop-color="#5d5d61"/><stop offset=".52" stop-color="#2a2a2c"/>
+              <stop offset="1" stop-color="#050505"/>
+            </linearGradient>
+            <linearGradient id="gWeight" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#070707"/><stop offset=".3" stop-color="#1b1b1d"/>
+              <stop offset=".46" stop-color="#47474b"/><stop offset=".6" stop-color="#19191b"/>
+              <stop offset="1" stop-color="#060606"/>
+            </linearGradient>
+            <radialGradient id="gBase" cx=".36" cy=".3" r=".8">
+              <stop offset="0" stop-color="#3d3d40"/><stop offset=".55" stop-color="#18181a"/><stop offset="1" stop-color="#080809"/>
+            </radialGradient>
+            <radialGradient id="gBearing" cx=".4" cy=".35" r=".7">
+              <stop offset="0" stop-color="#303033"/><stop offset="1" stop-color="#0b0b0c"/>
+            </radialGradient>
+            <linearGradient id="gShell" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0" stop-color="#404043"/><stop offset=".5" stop-color="#1c1c1e"/><stop offset="1" stop-color="#0a0a0b"/>
+            </linearGradient>
+            <filter id="fShadow" x="-40%" y="-40%" width="180%" height="180%">
+              <feDropShadow dx="7" dy="11" stdDeviation="4.5" flood-color="#000" flood-opacity=".7"/>
+            </filter>
+          </defs>
+
+          <!-- arm rest and cue lever -->
+          <g filter="url(#fShadow)">
+            <circle cx="209" cy="206" r="7" fill="url(#gBase)" stroke="rgba(255,255,255,.08)" stroke-width=".6"/>
+            <circle cx="209" cy="206" r="3.4" fill="#0a0a0b"/>
+            <circle cx="126" cy="112" r="5.5" fill="url(#gBase)" stroke="rgba(255,255,255,.08)" stroke-width=".6"/>
+            <rect x="104" y="110" width="22" height="4" rx="2" fill="url(#gWeight)" transform="rotate(-18 126 112)"/>
+          </g>
+
+          <!-- pivot base -->
+          <g filter="url(#fShadow)"><circle cx="156" cy="76" r="30" fill="url(#gBase)"/></g>
+          <g fill="none">
+            <circle cx="156" cy="76" r="29.5" stroke="rgba(255,255,255,.1)"/>
+            <circle cx="156" cy="76" r="25" stroke="rgba(255,255,255,.05)" stroke-width=".6"/>
+            <circle cx="156" cy="76" r="21" stroke="rgba(255,255,255,.09)" stroke-width=".6"/>
+          </g>
+          <g fill="#4a4a4d">
+            <circle cx="156" cy="49.5" r="1.3"/><circle cx="133" cy="89" r="1.3"/><circle cx="179" cy="89" r="1.3"/>
+          </g>
+          <circle cx="156" cy="76" r="15" fill="url(#gBearing)" stroke="rgba(255,255,255,.12)"/>
+
+          <!-- the moving arm -->
+          <g filter="url(#fShadow)">
+            <g class="swing">
+              <g transform="translate(156 76) rotate(13.9)">
+                <rect x="-2.5" y="-50" width="5" height="50" fill="url(#gTube)"/>
+                <rect x="-10" y="-42" width="20" height="5" rx="1" fill="#0b0b0c"/>
+                <rect x="-14" y="-66" width="28" height="26" rx="3" fill="url(#gWeight)"/>
+                <rect x="-14" y="-68" width="28" height="3.5" rx="1.5" fill="#0a0a0b"/>
+                <path d="M-14 -59h28M-14 -55h28M-14 -51h28" stroke="rgba(255,255,255,.05)" stroke-width=".6"/>
+                <rect x="-9" y="-11" width="18" height="22" rx="4" fill="url(#gWeight)"/>
+                <circle r="4" fill="#0a0a0b"/><circle cx="-1.2" cy="-1.2" r="1.1" fill="#5b5b5f"/>
+                <rect x="-3" y="10" width="6" height="146" rx="3" fill="url(#gTube)"/>
+                <path d="M-1 12V154" stroke="rgba(255,255,255,.22)" stroke-width=".6"/>
+                <rect x="-4.2" y="150" width="8.4" height="9" rx="1.5" fill="url(#gWeight)"/>
+                <g transform="translate(0 158) rotate(22)">
+                  <path d="M-6 0H6L9.5 31H-9.5Z" fill="url(#gShell)" stroke="rgba(255,255,255,.1)" stroke-width=".6"/>
+                  <path d="M8 9Q18 7 24 -1" fill="none" stroke="url(#gTube)" stroke-width="2.6" stroke-linecap="round"/>
+                  <rect x="-7.5" y="11" width="15" height="17" rx="1.5" fill="#050505"/>
+                  <rect x="-7.5" y="11" width="15" height="2.4" fill="#1d1d1f"/>
+                  <circle cx="-4" cy="15.5" r=".9" fill="#5e5e62"/><circle cx="4" cy="15.5" r=".9" fill="#5e5e62"/>
+                  <path d="M0 28V32" stroke="#9a9a9a" stroke-width=".8"/>
+                </g>
+              </g>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <div class="meta" id="meta">
+        <p class="track" id="track">Nothing on the platter</p>
+        <p class="artist" id="artist">Waiting for Spotify</p>
+        <p class="tag" id="tag"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="words" id="words" aria-label="Lyrics">
+    <div class="lyrics"><div class="sheet" id="sheet"></div></div>
+    <div class="tcard" id="tcard">
+      <p class="tk" id="tKicker">Last played</p>
+      <p class="ttitle" id="tTitle">Nothing on the platter</p>
+      <p class="tartist" id="tArtist"></p>
+      <p class="tfacts" id="tFacts"></p>
+    </div>
+    <div class="liner" id="liner">
+      <p class="lk" id="lKicker">From the album</p>
+      <p class="lalbum" id="lAlbum">—</p>
+      <p class="lfacts" id="lFacts"></p>
+      <div class="ltime"><span id="lNow">0:00</span><div class="lbar"><i id="lProg"></i></div><span id="lDur">0:00</span></div>
+      <p class="lnote" id="lNote"></p>
+    </div>
+  </section>
+</main>
+
+<div class="dimmer" id="dimmer" aria-hidden="true"></div>
+<p class="status" id="status" role="status"></p>
+
+<div class="setup" id="setup" hidden>
+  <form class="card" id="setupForm" aria-labelledby="setupTitle">
+    <h2 id="setupTitle">Connect Spotify</h2>
+    <p id="setupNote" hidden>One more permission is needed so the frame can show your last played song. Sign in again to allow it.</p>
+    <ol>
+      <li>In the Spotify Developer Dashboard, open your app and tick <strong>Web API</strong>.</li>
+      <li>Add this exact Redirect URI:</li>
+    </ol>
+    <span class="uri" id="redirectUri"></span>
+    <label for="clientId">Client ID</label>
+    <input id="clientId" autocomplete="off" spellcheck="false" placeholder="Paste your app's Client ID">
+    <button class="btn" type="submit">Sign in with Spotify</button>
+    <p>This only appears once. After that the frame just follows whatever Spotify is playing.</p>
+  </form>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try{ return localStorage.getItem(k) }catch(e){ return null } },
+  set(k,v){ try{ localStorage.setItem(k,v) }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k) }catch(e){} }
+};
+const params = new URLSearchParams(location.search);
+const REDIRECT = location.origin + location.pathname.replace(/index\.html$/,'');   // same address whether or not index.html is typed
+// Spotify sign-in works from your own computer, or from the page's home on GitHub Pages
+const LOCAL = /^(127\.0\.0\.1|\[::1\]|localhost)$/.test(location.hostname) || /\.github\.io$/.test(location.hostname);
+const SCOPES = 'user-read-currently-playing user-read-playback-state user-read-recently-played';
+
+/* one screen each on the final build: ?view=record / ?view=lyrics */
+const view = params.get('view');
+if(params.get('bg')==='drift') document.body.classList.add('bg-drift');
+document.body.classList.toggle('only-record', view==='record');
+document.body.classList.toggle('only-lyrics', view==='lyrics');
+
+/* ---------- state ---------- */
+const S = { mode:'demo', playing:false, trackId:null, title:'', artist:'', album:'', year:'', no:0, of:0,
+  durationMs:0, progressMs:0, stamp:performance.now(), art:null, lyrics:null, plain:false, activeIdx:-1 };
+const posMs = () => Math.min(S.durationMs || Infinity, S.progressMs + (S.playing ? performance.now()-S.stamp : 0));
+const fmt = ms => { const s=Math.max(0,Math.round(ms/1000)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+
+function status(msg){ $('status').textContent = msg || ''; }
+
+/* ---------- spin: a slow, steady 6 RPM (one turn every 10 seconds), easing up on play and down on pause ---------- */
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const RPM = 6;
+let angle = 0, vel = 0, last = performance.now(), stopPlan = null;
+function frame(now){
+  const dt = Math.min(.1,(now-last)/1000); last = now;
+  if(S.playing && !reduce){
+    stopPlan = null;
+    vel += (RPM*6 - vel) * Math.min(1, dt*1.2);                // ease up to speed (rpm -> deg/s)
+    angle = (angle + vel*dt) % 360;
+  } else if(vel > 0.5 || stopPlan){
+    // wind down along a curve that lands exactly upright (0 deg) and never turns backwards
+    if(!stopPlan){
+      const a0 = ((angle % 360) + 360) % 360;
+      let d = (360 - a0) % 360; if(d < 30) d += 360;
+      const v = vel, T = Math.max(1.2, 1.2*d/v);
+      stopPlan = { from:a0, d, v, T, t0:now, a:(3*d-2*v*T)/(T*T), b:(v*T-2*d)/(T*T*T) };
+    }
+    const P = stopPlan, t = Math.min(P.T, (now-P.t0)/1000);
+    angle = (P.from + P.v*t + P.a*t*t + P.b*t*t*t) % 360;
+    vel = Math.max(0, P.v + 2*P.a*t + 3*P.b*t*t);
+    if(t >= P.T){ angle = 0; vel = 0; stopPlan = null; }
+  }
+  $('spin').style.transform = `rotate(${angle}deg)`;
+  tickLyrics(); tickLiner(); tickSweep(now);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- now playing ---------- */
+let stopT=null;
+function setTrackUI(){
+  document.body.classList.toggle('playing', S.playing);
+  // once the record has wound down, swap to the title card; any play brings everything back at once
+  if(S.playing){ clearTimeout(stopT); stopT=null; if(document.body.classList.contains('stopped')){ document.body.classList.remove('stopped'); centerCard(); } }
+  else if(!document.body.classList.contains('stopped') && !stopT){ stopT=setTimeout(()=>{ stopT=null; if(!S.playing){ document.body.classList.add('stopped'); centerCard(); } }, 1800); }
+  $('lDur').textContent = fmt(S.durationMs);
+  if(!swapping && S.art===shown) writeText(snap());   // otherwise the text changes with the next sweep
+}
+const snap = () => ({title:S.title, tag:S.tag, artist:S.artist, album:S.album, year:S.year, no:S.no, of:S.of});
+function writeText(t){
+  $('track').textContent = t.title || 'Nothing on the platter';
+  $('artist').textContent = t.artist || 'Waiting for Spotify';
+  $('tag').textContent = t.tag || '';
+  $('lAlbum').textContent = t.album || t.title || '—';
+  $('lKicker').textContent = t.album ? 'From the album' : 'Now playing';
+  const facts = [];
+  if(t.year) facts.push(t.year);
+  if(t.no && t.of > 1) facts.push(`Track ${t.no} of ${t.of}`);
+  $('lFacts').textContent = facts.join('  ·  ');
+  $('tTitle').textContent = t.title || 'Nothing on the platter';
+  $('tArtist').textContent = t.artist || '';
+  $('tFacts').textContent = [t.tag, t.album, t.year].filter(Boolean).join('  ·  ');
+  if(document.body.classList.contains('stopped')) requestAnimationFrame(centerCard);
+}
+function tickLiner(){
+  const p = posMs();
+  $('lNow').textContent = fmt(p);
+  $('lProg').style.width = (S.durationMs ? Math.min(100, p/S.durationMs*100) : 0) + '%';
+}
+/* new cover sweeps in clockwise from 12 o'clock as the record turns; the old one goes with it */
+/* Changes are queued: quick skips settle for a moment, a sweep always finishes,
+   and the next sweep starts from a fully drawn cover, so nothing snaps or flickers. */
+let sweepStart=null, shown=undefined, busy=false, swapping=false, settleT=null;
+const SWEEP_MS=3400, SETTLE_MS=800;
+function setArt(url){
+  S.art = url;
+  clearTimeout(settleT);
+  settleT = setTimeout(nextSweep, shown===undefined ? 0 : SETTLE_MS);
+}
+function loadImg(src){
+  return new Promise(res=>{ const im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; });
+}
+async function nextSweep(){
+  if(busy || S.art===shown) return;
+  busy = true;
+  const url = S.art, src = url || blank();
+  const pre = await loadImg(src);
+  if(S.art !== url){ busy=false; return nextSweep(); }        // changed again while loading
+  const cur=$('art'), old=$('artOld');
+  if(cur.src){ old.src = cur.src; try{ await old.decode(); }catch(e){} }
+  setMask(reduce ? 360 : 0);                                   // hide the new cover before it is swapped in
+  cur.crossOrigin='anonymous'; cur.src = pre ? src : blank();
+  try{ await cur.decode(); }catch(e){}
+  shown = url;
+  if(pre) applyPalette(pre);
+  const t = snap(), m=$('meta');
+  swapping = true; m.classList.add('swap');
+  setTimeout(()=>{ writeText(t); m.classList.remove('swap'); swapping=false; flushLyrics(); }, 950);
+  if(reduce){ busy=false; return; }
+  sweepStart = performance.now();
+}
+function setMask(deg){
+  const el=$('art');
+  if(deg>=360){ el.style.maskImage=el.style.webkitMaskImage=''; return; }
+  const m=`conic-gradient(from 0deg, #000 ${Math.max(0,deg-14)}deg, transparent ${deg}deg)`;
+  el.style.maskImage=m; el.style.webkitMaskImage=m;
+}
+function tickSweep(now){
+  if(sweepStart===null) return;
+  const t=Math.min(1,(now-sweepStart)/SWEEP_MS), e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+  setMask(e*374);
+  if(t>=1){ sweepStart=null; setMask(360); busy=false; if(S.art!==shown) settleT=setTimeout(nextSweep, 300); }
+}
+
+/* palette: the three strongest colour families in the cover, toned down for a wall glow */
+function rgb2hsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2; let h=0,s=0;
+  if(mx!==mn){ const d=mx-mn; s=l>.5?d/(2-mx-mn):d/(mx+mn);
+    h=mx===r?((g-b)/d+(g<b?6:0)):mx===g?((b-r)/d+2):((r-g)/d+4); h/=6; }
+  return [h,s,l]; }
+function palette(img){
+  const c=document.createElement('canvas'); c.width=c.height=40; const x=c.getContext('2d'); x.drawImage(img,0,0,40,40);
+  const d=x.getImageData(0,0,40,40).data, bins=Array.from({length:13},()=>({w:0,h:0,s:0,l:0,n:0}));
+  for(let i=0;i<d.length;i+=4){
+    const [h,s,l]=rgb2hsl(d[i],d[i+1],d[i+2]); if(l<.06||l>.96) continue;
+    const k = s<.18 ? 12 : Math.floor(h*12)%12, w = s<.18 ? .25 : s*(1-Math.abs(l-.5)*1.3);
+    const b=bins[k]; b.w+=w; b.n++; b.h+=h; b.s+=s; b.l+=l;
+  }
+  const picked=bins.filter(b=>b.n>8).sort((a,b)=>b.w-a.w).slice(0,3).map(b=>[b.h/b.n,b.s/b.n,b.l/b.n]);
+  if(!picked.length) picked.push([0.07,.1,.3]);
+  while(picked.length<3) picked.push([picked[0][0],picked[0][1]*.7,picked[0][2]*.7]);
+  return picked;
+}
+/* muted tones for the wide background wash */
+function washTones(pk){ return pk.map(([h,s,l],i)=>`hsl(${Math.round(h*360)} ${Math.round(Math.min(s,.7)*100)}% ${Math.round(Math.min(Math.max(l,.22),.48)*(i?0.85:1)*100)}%)`); }
+/* brighter, richer tones for the light glowing from behind the record */
+function glowTones(pk){ return pk.map(([h,s,l],i)=>{
+  const sat = s<.18 ? s*100 : Math.min(85, Math.max(45, s*120));
+  const lit = Math.min(68, Math.max(50, l*100+12)) - i*6;
+  return `hsl(${Math.round(h*360)} ${Math.round(sat)}% ${Math.round(lit)}%)`; });
+}
+let bgFront='bgA';
+function applyPalette(img){
+  let pk, p, g; try{ pk=palette(img); p=washTones(pk); g=glowTones(pk); }catch(e){ return; }
+  const next = bgFront==='bgA' ? 'bgB' : 'bgA', el=$(next);
+  el.style.setProperty('--a',p[0]); el.style.setProperty('--b',p[1]); el.style.setProperty('--c',p[2]);
+  el.classList.add('on'); $(bgFront).classList.remove('on');
+  const hn=$(next==='bgA'?'haloA':'haloB'), ho=$(next==='bgA'?'haloB':'haloA');
+  hn.style.setProperty('--a',g[0]); hn.style.setProperty('--b',g[1]); hn.style.setProperty('--c',g[2]);
+  hn.classList.add('on'); ho.classList.remove('on');
+  // the cover itself becomes the light on the wall
+  const fn=$(next==='bgA'?'fieldA':'fieldB'), fo=$(next==='bgA'?'fieldB':'fieldA');
+  try{ paintWall(fn, img, pk); }catch(e){ console.warn(e); }
+  fn.classList.add('on'); fo.classList.remove('on');
+  bgFront=next;
+  document.documentElement.style.setProperty('--glow',p[0]);
+}
+/* ---------- the wall: a one-off design for every album, drawn from its cover ----------
+   Drawn once per song on a small 320x180 canvas, then stretched to the screen with a
+   fine grain on top: cheap for a small computer and smooth on a basic screen. */
+const BW=320, BH=180;
+const BG_STYLES=['projection','orbs','bands','beams','rings','field'];
+function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function hslRgb(h,s,l){ const k=n=>(n+h*12)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1))); return [f(0)*255,f(8)*255,f(4)*255]; }
+function lit(c, l, s){ // re-light a colour cell: keep its hue, set lightness/saturation for glowing light
+  const sat = c.s<.15 ? c.s : Math.min(.9, Math.max(.45, c.s*1.25));
+  return hslRgb(c.h, s ?? sat, l);
+}
+const rgba=(rgb,a)=>`rgba(${rgb.map(v=>Math.round(v)).join(',')},${a})`;
+
+function analyseCover(img){
+  const c=document.createElement('canvas'); c.width=c.height=16; const x=c.getContext('2d');
+  x.drawImage(img,0,0,16,16);
+  const d=x.getImageData(0,0,16,16).data, cells=[]; let sat=0, lum=0, edge=0;
+  for(let y=0;y<16;y++) for(let q=0;q<16;q++){
+    const i=(y*16+q)*4, [h,s,l]=rgb2hsl(d[i],d[i+1],d[i+2]);
+    sat+=s; lum+=l; cells.push({x:q/15,y:y/15,h,s,l});
+    if(q>0) edge+=(Math.abs(d[i]-d[i-4])+Math.abs(d[i+1]-d[i-3])+Math.abs(d[i+2]-d[i-2]))/765;
+  }
+  return {sat:sat/256, lum:lum/256, edge:edge/240, cells};
+}
+function chooseStyle(a, seed){
+  const forced=params.get('bgstyle'); if(BG_STYLES.includes(forced)) return forced;
+  let opts;
+  if(a.sat<.14)       opts=['projection','beams','rings'];          // black & white, monochrome
+  else if(a.edge>.16) opts=['orbs','projection','beams'];           // busy, detailed, photographic
+  else if(a.edge<.07) opts=['bands','rings','field'];               // smooth, minimal, gradients
+  else                opts=['projection','orbs','bands','field'];
+  return opts[seed % opts.length];
+}
+function topCells(a, n){
+  const picked=[];
+  const score=c=>(c.s<.15?.15:c.s)*(1-Math.abs(c.l-.55));
+  for(const c of [...a.cells].sort((p,q)=>score(q)-score(p))){
+    if(picked.every(p=>Math.hypot(p.x-c.x,p.y-c.y)>.3)) picked.push(c);
+    if(picked.length===n) break;
+  }
+  return picked;
+}
+
+function drawWall(cv, img, a, style, seed, g){
+  const x=cv.getContext('2d'); x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,BW,BH);
+  x.globalCompositeOperation='source-over'; x.globalAlpha=1; if('filter' in x) x.filter='none';
+  const pr=document.querySelector('.platter').getBoundingClientRect();
+  const rx=(pr.left+pr.width/2-shift)/innerWidth*BW, ry=(pr.top+pr.height/2)/innerHeight*BH, rr=pr.width/2/innerWidth*BW;
+  const rnd=(k)=>((Math.imul(seed^(k*2654435761),2246822519)>>>0)%1000)/1000;
+  const blur=px=>{ if('filter' in x) x.filter=`blur(${px}px)`; };
+  const cover=(size)=>{ const c=document.createElement('canvas'); c.width=c.height=size; c.getContext('2d').drawImage(img,0,0,size,size); return c; };
+
+  if(style==='field'){
+    blur(12); if('filter' in x) x.filter='blur(12px) saturate(1.6)';
+    const s=BH*1.9; x.drawImage(cover(7), rx-s/2, ry-s/2, s, s);
+  }
+  else if(style==='projection'){
+    // the cover itself, huge and duotoned like light from a projector
+    const c=cover(48), cx=c.getContext('2d'), id=cx.getImageData(0,0,48,48), p=id.data;
+    const dark=hslRgb(topCells(a,1)[0].h, .3, .06), mid=lit(topCells(a,2)[1]||topCells(a,1)[0], .42), hi=lit(topCells(a,1)[0], .78);
+    for(let i=0;i<p.length;i+=4){
+      const L=Math.pow((0.2126*p[i]+0.7152*p[i+1]+0.0722*p[i+2])/255, 0.9);
+      const [A,B,t]= L<.5 ? [dark,mid,L*2] : [mid,hi,(L-.5)*2];
+      p[i]=A[0]+(B[0]-A[0])*t; p[i+1]=A[1]+(B[1]-A[1])*t; p[i+2]=A[2]+(B[2]-A[2])*t; p[i+3]=255;
+    }
+    cx.putImageData(id,0,0);
+    // feather the square edges so the projection melts into the wall
+    cx.globalCompositeOperation='destination-in';
+    const fe=cx.createRadialGradient(24,24,10,24,24,24); fe.addColorStop(0,'rgba(0,0,0,1)'); fe.addColorStop(1,'rgba(0,0,0,0)');
+    cx.fillStyle=fe; cx.fillRect(0,0,48,48); cx.globalCompositeOperation='source-over';
+    blur(2.5);
+    const s=BH*1.7, ang=(rnd(1)-.5)*0.35, ox=rx+rr*(0.35+rnd(2)*0.5), oy=ry+(rnd(3)-.5)*BH*.15;
+    x.translate(ox,oy); x.rotate(ang); x.drawImage(c,-s/2,-s/2,s,s); x.setTransform(1,0,0,1,0,0);
+  }
+  else if(style==='orbs'){
+    blur(10); x.globalCompositeOperation='lighter';
+    topCells(a,6).forEach((c,i)=>{
+      const px=rx+(c.x-.5)*BW*1.1, py=ry+(c.y-.5)*BH*1.3, r=BH*(.38+.4*(1-i/6));
+      const col=lit(c,.6), gr=x.createRadialGradient(px,py,0,px,py,r);
+      gr.addColorStop(0,rgba(col,1)); gr.addColorStop(.5,rgba(col,.45)); gr.addColorStop(1,rgba(col,0));
+      x.fillStyle=gr; x.fillRect(0,0,BW,BH);
+    });
+  }
+  else if(style==='bands'){
+    // the cover's colours from top to bottom, stretched into broad horizon bands at an angle
+    const col=cover(1).getContext('2d'), strip=document.createElement('canvas'); strip.width=1; strip.height=8;
+    strip.getContext('2d').drawImage(img,0,0,1,8);
+    const sd=strip.getContext('2d').getImageData(0,0,1,8).data;
+    const ang=[0, .35, -.35, Math.PI/2][seed%4], L=Math.hypot(BW,BH);
+    const gx=Math.cos(ang+Math.PI/2)*L/2, gy=Math.sin(ang+Math.PI/2)*L/2;
+    const gr=x.createLinearGradient(BW/2-gx,BH/2-gy,BW/2+gx,BH/2+gy);
+    for(let k=0;k<8;k++){ const [h,s,l]=rgb2hsl(sd[k*4],sd[k*4+1],sd[k*4+2]); gr.addColorStop(k/7, rgba(lit({h,s,l}, Math.min(.62,Math.max(.3,l*1.05))),1)); }
+    blur(4); x.fillStyle=gr; x.fillRect(-20,-20,BW+40,BH+40);
+    // a darker horizon line through the record, so the bands read as a landscape behind it
+    const hz=x.createLinearGradient(0,ry-BH*.18,0,ry+BH*.18); hz.addColorStop(0,'rgba(0,0,0,0)'); hz.addColorStop(.5,'rgba(0,0,0,.35)'); hz.addColorStop(1,'rgba(0,0,0,0)');
+    x.fillStyle=hz; x.fillRect(0,0,BW,BH);
+  }
+  else if(style==='beams'){
+    const n=7+(seed%6), cols=topCells(a,3).map(c=>lit(c,.6)), start=rnd(4)*Math.PI*2, R=Math.hypot(BW,BH);
+    blur(6); x.globalCompositeOperation='lighter';
+    for(let k=0;k<n;k++){
+      const a0=start+k*2*Math.PI/n, w=(Math.PI/n)*(.35+rnd(10+k)*.5);
+      const gr=x.createRadialGradient(rx,ry,rr*.8,rx,ry,R);
+      const col=cols[k%cols.length]; gr.addColorStop(0,rgba(col,.55)); gr.addColorStop(1,rgba(col,0));
+      x.fillStyle=gr; x.beginPath(); x.moveTo(rx,ry); x.arc(rx,ry,R,a0-w/2,a0+w/2); x.closePath(); x.fill();
+    }
+  }
+  else if(style==='rings'){
+    const cols=topCells(a,3).map(c=>lit(c,.58)), step=rr*(.32+rnd(5)*.2);
+    blur(3.5);
+    for(let k=0;k<14;k++){
+      const r=rr*1.08+k*step; x.lineWidth=step*(.28+rnd(20+k)*.3);
+      x.strokeStyle=rgba(cols[k%cols.length], Math.max(0,.6-k*.045)); x.beginPath(); x.arc(rx,ry,r,0,Math.PI*2); x.stroke();
+    }
+  }
+  if('filter' in x) x.filter='none';
+  // light falls off away from the record, so the right-hand side stays calm for the lyrics
+  x.globalCompositeOperation='destination-in';
+  const fall=x.createRadialGradient(rx,ry,rr*.6,rx,ry,BW*.85);
+  fall.addColorStop(0,'rgba(0,0,0,1)'); fall.addColorStop(.55,'rgba(0,0,0,.6)'); fall.addColorStop(1,'rgba(0,0,0,.14)');
+  x.fillStyle=fall; x.fillRect(0,0,BW,BH);
+  x.globalCompositeOperation='source-over';
+  // overall brightness, used to hold back bright designs
+  const sm=document.createElement('canvas'); sm.width=16; sm.height=9; sm.getContext('2d').drawImage(cv,0,0,16,9);
+  const d=sm.getContext('2d').getImageData(0,0,16,9).data; let y=0;
+  for(let i=0;i<d.length;i+=4) y+=(0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])/255*(d[i+3]/255);
+  return y/(d.length/4);
+}
+let wallState=null;
+function paintWall(cv, img, pk){
+  const a=analyseCover(img), seed=hashStr((S.album||S.title||'')+'|'+(S.artist||'')), style=chooseStyle(a, seed);
+  const lum=drawWall(cv, img, a, style, seed);
+  cv.dataset.style=style;
+  cv.style.setProperty('--fieldop', Math.min(.95, Math.max(.35, 0.24/Math.max(lum,.02))).toFixed(2));
+  const [h,sat]=pk[0];
+  document.documentElement.style.setProperty('--wall', `hsl(${Math.round(h*360)} ${Math.round(Math.min(sat,.6)*45)}% 7%)`);
+  wallState={cv, img, pk};
+}
+let wallResizeT=null;
+addEventListener('resize',()=>{ clearTimeout(wallResizeT); wallResizeT=setTimeout(()=>{ if(wallState) paintWall(wallState.cv, wallState.img, wallState.pk); },400); });
+
+function blank(){ const c=document.createElement('canvas'); c.width=c.height=8; const x=c.getContext('2d'); x.fillStyle='#141312'; x.fillRect(0,0,8,8); return c.toDataURL(); }
+
+
+/* ---------- lyrics, with liner notes when there are none ---------- */
+const LEAD_MS = 250;
+function parseLRC(txt){
+  const out=[];
+  for(const raw of txt.split(/\r?\n/)){
+    const tags=[...raw.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    const text=raw.replace(/\[[^\]]*\]/g,'').trim();
+    for(const t of tags) out.push({t:(+t[1]*60 + +t[2])*1000, text: text || '♪'});
+  }
+  return out.sort((a,b)=>a.t-b.t);
+}
+function showLiner(note){
+  clearTimeout(lyricSwap); $('sheet').classList.remove('fade'); S.lyrics=null; $('words').classList.remove('has-lyrics'); $('lNote').textContent = note || '';
+}
+let lyricSwap=null;
+function renderLyrics(lines, plain){
+  const sheet=$('sheet');
+  if($('words').classList.contains('has-lyrics') && sheet.children.length){
+    sheet.classList.add('fade'); clearTimeout(lyricSwap);
+    S.lyrics=null;
+    lyricSwap=setTimeout(()=>{ drawLyrics(lines,plain); requestAnimationFrame(()=>sheet.classList.remove('fade')); },700);
+    return;
+  }
+  drawLyrics(lines,plain);
+}
+function drawLyrics(lines, plain){
+  const sheet=$('sheet'); sheet.innerHTML=''; sheet.classList.toggle('plain',!!plain);
+  S.lyrics=lines; S.plain=!!plain; S.activeIdx=-1;
+  for(const l of lines){ const d=document.createElement('div'); d.className='line'; d.textContent=l.text; sheet.appendChild(d); }
+  $('words').classList.add('has-lyrics');
+  layoutLyrics(true);
+}
+function tickLyrics(){
+  const w=$('words');
+  const intro = !!(S.lyrics && !S.plain && S.lyrics[0] && S.lyrics[0].t > 8000 && posMs() < S.lyrics[0].t - 2500);
+  if(w.classList.contains('intro')!==intro){ w.classList.toggle('intro',intro); if(intro) $('lNote').textContent=''; }
+  if(!S.lyrics || S.plain) return;
+  const p=posMs()+LEAD_MS; let i=-1;
+  for(let k=0;k<S.lyrics.length;k++){ if(S.lyrics[k].t<=p) i=k; else break; }
+  if(i!==S.activeIdx){ S.activeIdx=i; layoutLyrics(false); }
+}
+function layoutLyrics(force){
+  const sheet=$('sheet'), box=sheet.parentElement, kids=sheet.children;
+  if(!S.lyrics || !kids.length) return;
+  if(S.plain){ autoScrollPlain(); return; }
+  [...kids].forEach((el,k)=>{ el.classList.toggle('now',k===S.activeIdx); el.classList.toggle('past',k<S.activeIdx); });
+  const el=kids[Math.max(0,S.activeIdx)];
+  const y=box.clientHeight*0.5 - (el.offsetTop + el.offsetHeight/2);
+  if(force){ sheet.style.transition='none'; sheet.style.transform=`translateY(${y}px)`; sheet.offsetHeight; sheet.style.transition=''; }
+  else sheet.style.transform=`translateY(${y}px)`;
+}
+function autoScrollPlain(){
+  const sheet=$('sheet'), box=sheet.parentElement;
+  const travel=Math.max(0, sheet.scrollHeight - box.clientHeight*0.6);
+  const f=S.durationMs ? posMs()/S.durationMs : 0;
+  sheet.style.transform=`translateY(${box.clientHeight*0.3 - travel*f}px)`;
+}
+setInterval(()=>{ if(S.plain && S.lyrics) autoScrollPlain(); }, 1000);
+
+const lyricCache=new Map();
+/* new lyrics wait (hidden) until the new cover and name have swapped in */
+let pendingLyrics=null;
+function gateLyrics(rec,key){ pendingLyrics={rec,key}; if(S.art===shown && !swapping) flushLyrics(); }
+function flushLyrics(){
+  const p=pendingLyrics; if(!p || p.key!==S.trackId) return;
+  pendingLyrics=null; applyLyrics(p.rec); $('words').classList.remove('between');
+}
+async function loadLyrics(){
+  const key=S.trackId; if(!key) return;
+  $('words').classList.add('between');
+  if(lyricCache.has(key)) return gateLyrics(lyricCache.get(key),key);
+  let rec=null;
+  try{
+    const a=S.artist.split(',')[0], raw=S.rawTitle||S.title;
+    const q=new URLSearchParams({artist_name:a,track_name:raw,album_name:S.album,duration:Math.round(S.durationMs/1000)});
+    let r=await fetch('https://lrclib.net/api/get?'+q);
+    if(r.ok) rec=await r.json();
+    for(const name of [raw, S.title]){
+      if(rec) break;
+      r=await fetch('https://lrclib.net/api/search?'+new URLSearchParams({track_name:name,artist_name:a}));
+      if(r.ok){ const list=await r.json(); rec=list.find(x=>x.syncedLyrics)||list[0]||null; }
+      if(name===S.title) break;
+    }
+  }catch(e){ rec={offline:true}; }
+  if(!rec?.offline) lyricCache.set(key,rec);
+  if(S.trackId===key) gateLyrics(rec,key);
+}
+function applyLyrics(rec){
+  if(rec?.syncedLyrics) return renderLyrics(parseLRC(rec.syncedLyrics),false);
+  if(rec?.plainLyrics) return renderLyrics(rec.plainLyrics.split(/\r?\n/).filter(Boolean).map(t=>({t:0,text:t})),true);
+  showLiner(rec?.instrumental ? 'Instrumental' : '');
+}
+
+function newTrack(t){
+  Object.assign(S,{trackId:t.id,title:t.title,rawTitle:t.rawTitle||t.title,tag:t.tag||'',artist:t.artist,album:t.album||'',year:t.year||'',no:t.no||0,of:t.of||0,
+    durationMs:t.dur,progressMs:t.progress||0,stamp:performance.now(),playing:t.playing});
+  setArt(t.art);
+  setTrackUI();
+}
+
+/* ---------- demo (made-up songs, shown when not signed in) ---------- */
+function demoArt(title,c1,c2,shape){
+  const c=document.createElement('canvas'); c.width=c.height=640; const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,640,640); g.addColorStop(0,c1); g.addColorStop(1,c2); x.fillStyle=g; x.fillRect(0,0,640,640);
+  x.strokeStyle='rgba(245,226,200,.5)'; x.lineWidth=10;
+  if(shape===0) for(let i=0;i<9;i++){ x.beginPath(); x.arc(320,410,60+i*38,Math.PI,0); x.globalAlpha=1-i*.09; x.stroke(); }
+  if(shape===1) for(let i=0;i<7;i++){ x.strokeRect(120+i*22,120+i*22,400-i*44,400-i*44); }
+  if(shape===2) for(let i=0;i<14;i++){ x.beginPath(); x.moveTo(0,40+i*44); x.bezierCurveTo(200,i*44,420,100+i*44,640,40+i*44); x.stroke(); }
+  if(shape===3){ x.beginPath(); x.arc(320,300,150,0,Math.PI*2); x.fillStyle='rgba(245,226,200,.85)'; x.fill(); }
+  x.globalAlpha=1; x.fillStyle='rgba(16,14,13,.85)'; x.fillRect(0,480,640,160);
+  x.fillStyle='#f3e3cb'; x.font='800 44px "Bricolage Grotesque", Arial'; x.textAlign='center'; x.fillText(title.toUpperCase(),320,572);
+  return c.toDataURL('image/jpeg',.88);
+}
+const DEMO_LRC=`[00:02.0]Radio hums against the kitchen tile
+[00:06.5]Kettle's on, I let it ring a while
+[00:11.0]Every song you left is still in rotation
+[00:15.5]Spinning slow beneath the station
+[00:20.0]
+[00:24.0]Low tide static, low tide static
+[00:28.5]Pulling all the sound back out to sea
+[00:33.0]Low tide static, low tide static
+[00:37.5]Leave the needle down and wait for me
+[00:42.0]
+[00:46.0]Windows fogging up with summer rain
+[00:50.5]Dust on every sleeve, I know each name
+[00:55.0]Turn it over, side B, same old feeling
+[00:59.5]Shadows moving slow across the ceiling`;
+const DEMO=[
+  {id:'d1',title:'Low Tide Static',artist:'The Harbour Lights',album:'Side B',year:'2024',no:3,of:10,dur:44000,lrc:DEMO_LRC,c:['#1d3b4f','#d9774a'],s:0},
+  {id:'d2',title:'Glasshouse',artist:'Orla Vane',album:'Northern Rooms',year:'2023',no:7,of:9,dur:26000,instrumental:true,c:['#2b2440','#8fb3a8'],s:1},
+  {id:'d3',title:'Paper Moons',artist:'Kites Over Leeds',album:'Paper Moons',year:'2025',no:1,of:1,dur:26000,c:['#5a1f24','#e3b35a'],s:3},
+  {id:'d4',title:'Slow Weather',artist:'Mara Quist',album:'Coastline Radio',year:'2022',no:2,of:11,dur:26000,c:['#18322b','#c9c3a8'],s:2}
+];
+DEMO.forEach(d=>d.art=demoArt(d.title,d.c[0],d.c[1],d.s));
+let demoIdx=0;
+function playDemo(i){
+  demoIdx=i%DEMO.length;
+  const d=DEMO[demoIdx];
+  newTrack({...d,playing:true});
+  $('words').classList.add('between');
+  gateLyrics(d.lrc ? {syncedLyrics:d.lrc} : {instrumental:!!d.instrumental}, d.id);
+}
+setInterval(()=>{ if(S.mode==='demo' && posMs()>=S.durationMs) playDemo(demoIdx+1); },500);
+
+/* ---------- Spotify sign-in (PKCE, no server needed) ---------- */
+const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+async function beginAuth(id){
+  store.set('ns.client',id);
+  const verifier=b64url(crypto.getRandomValues(new Uint8Array(48)));
+  store.set('ns.verifier',verifier);
+  const challenge=b64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
+  location.href='https://accounts.spotify.com/authorize?'+new URLSearchParams({
+    response_type:'code',client_id:id,scope:SCOPES,redirect_uri:REDIRECT,code_challenge_method:'S256',code_challenge:challenge});
+}
+async function tokenRequest(body){
+  const r=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)});
+  if(!r.ok){ let m='HTTP '+r.status; try{ const e=await r.json(); m=e.error_description||e.error||m; }catch(_){} throw new Error('Spotify sign-in failed: '+m); }
+  const j=await r.json();
+  store.set('ns.token',j.access_token); store.set('ns.expires',Date.now()+(j.expires_in-60)*1000);
+  if(j.refresh_token) store.set('ns.refresh',j.refresh_token);
+  if(j.scope) store.set('ns.scope',j.scope);
+}
+async function token(){
+  if(store.get('ns.token') && Date.now() < +store.get('ns.expires')) return store.get('ns.token');
+  if(!store.get('ns.refresh')) return null;
+  await tokenRequest({grant_type:'refresh_token',refresh_token:store.get('ns.refresh'),client_id:store.get('ns.client')});
+  return store.get('ns.token');
+}
+async function api(path){
+  const t=await token(); if(!t) throw new Error('signed-out');
+  return fetch('https://api.spotify.com/v1'+path,{headers:{Authorization:'Bearer '+t}});
+}
+
+/* ---------- follow Spotify (every 3s; position is smoothed between polls) ---------- */
+let pollTimer=null;
+async function poll(){
+  try{
+    const r=await api('/me/player/currently-playing?additional_types=track,episode');
+    if(r.status===401){ store.del('ns.expires'); }
+    else if(r.status===204){ idle(); status(''); }
+    else if(!r.ok){
+      let m=''; try{ m=(await r.json()).error?.message||''; }catch(_){}
+      status(r.status===403 ? 'Spotify refused access. In the Developer Dashboard, add your Spotify email under User Management.' : r.status===429 ? '' : 'Spotify error '+r.status+'. '+m);
+    } else {
+      status('');
+      const j=await r.json(), item=j.item;
+      if(!item){ S.playing=j.is_playing; setTrackUI(); }          // DJ voice, ads: keep the last record on
+      else{
+        const changed=item.id!==S.trackId || S.fromIdle;   // the 'last played' placeholder never counts as loaded
+        const al=item.album||{};
+        const t={...trackFrom(item), progress:j.progress_ms, playing:j.is_playing};
+        if(changed){
+          S.fromIdle=false;
+          newTrack(t);
+          const {progress,playing,...keep}=t; store.set('ns.last',JSON.stringify(keep));
+          if(item.type==='episode') showLiner('Podcast'); else loadLyrics();
+        } else {
+          Object.assign(S,{progressMs:j.progress_ms,stamp:performance.now(),playing:j.is_playing}); setTrackUI();
+        }
+      }
+    }
+  }catch(e){
+    if(e.message==='signed-out'){ showSetup(); return; }
+    status(e.message.startsWith('Spotify') ? e.message : 'Can’t reach Spotify. Retrying…');
+  }
+  pollTimer=setTimeout(poll,3000);
+}
+/* "MUTT (feat. Chris Brown) [CB REMIX]" -> title "MUTT", artists gain Chris Brown, small tag "CB Remix".
+   Remaster notes are dropped; remix / live / acoustic / edit / version notes are kept as a tag. */
+function cleanTitle(name, artists){
+  let t=name||'', feats=[], tags=[];
+  const featRe=/\s*[\(\[]\s*(?:feat\.?|ft\.?|featuring|with)\s+([^\)\]]+)[\)\]]/i;
+  let m; while((m=t.match(featRe))){ feats.push(...m[1].split(/\s*(?:,|&|\band\b)\s*/i)); t=t.replace(m[0],''); }
+  m=t.match(/\s+-\s+(?:feat\.?|ft\.?)\s+(.+)$/i); if(m){ feats.push(...m[1].split(/\s*(?:,|&)\s*/)); t=t.replace(m[0],''); }
+  t=t.replace(/\s*[\(\[]([^\)\]]+)[\)\]]/g,(all,inner)=>{ if(!/remaster|mono|stereo|bonus/i.test(inner)) tags.push(inner); return ''; });
+  m=t.match(/\s+-\s+(.+)$/); if(m){ if(!/remaster|mono|stereo|\d{4} mix/i.test(m[1])) tags.push(m[1]); t=t.replace(m[0],''); }
+  const tc=x=>x.toLowerCase().replace(/\b([a-z])/g,c=>c.toUpperCase());
+  const tag=tags.map(x=>x===x.toUpperCase()&&/[A-Z]{3,}/.test(x)?tc(x).replace(/\bCb\b/,'CB'):x).join(' \u00b7 ');
+  const all=[...artists];
+  for(const f of feats.map(x=>x.trim()).filter(Boolean)) if(!all.some(a=>a.toLowerCase()===f.toLowerCase())) all.push(f);
+  return { title:t.trim()||name, artist:all.join(', '), tag };
+}
+function trackFrom(item){
+  const al=item.album||{};
+  const c=cleanTitle(item.name,(item.artists||[]).map(a=>a.name));
+  return {id:item.id,title:c.title,rawTitle:item.name,tag:c.tag,artist:c.artist||item.show?.name||'',
+    album:al.album_type==='single' && al.total_tracks===1 ? '' : (al.name||''), year:(al.release_date||'').slice(0,4),
+    no:item.track_number, of:al.total_tracks, dur:item.duration_ms, art:(al.images||item.images||[])[0]?.url||null};
+}
+let askedRecent=false;
+async function fetchRecent(){
+  try{
+    const r=await api('/me/player/recently-played?limit=1'); if(!r.ok) return;
+    const it=(await r.json()).items?.[0]?.track;
+    if(it) store.set('ns.last',JSON.stringify(trackFrom(it)));
+  }catch(e){}
+}
+function idle(){
+  // Spotify not in use: leave the last record on the platter, stopped, arm on its rest
+  let last=null; try{ last=JSON.parse(store.get('ns.last')||'null'); }catch(e){}
+  if(!last && S.mode==='spotify' && !askedRecent){ askedRecent=true; fetchRecent().then(()=>{ if(!S.playing) idle(); }); }
+  if(last){
+    if(S.trackId!==last.id){ newTrack({...last,progress:0,playing:false}); S.fromIdle=true; showLiner('Last played'); }
+    else if(S.playing){ S.playing=false; setTrackUI(); }
+    return;
+  }
+  Object.assign(S,{playing:false,trackId:null,title:'',artist:'',album:'',year:'',no:0,of:0,durationMs:0,progressMs:0});
+  setArt(null); setTrackUI(); showLiner(''); $('lAlbum').textContent='Nothing on the platter'; $('lKicker').textContent='Waiting';
+}
+function startSpotify(){ S.mode='spotify'; $('setup').hidden=true; idle(); clearTimeout(pollTimer); poll(); }
+function showSetup(){
+  clearTimeout(pollTimer); ['ns.token','ns.refresh','ns.expires'].forEach(store.del);
+  S.mode='demo'; playDemo(0);
+  if(LOCAL) $('setup').hidden=false;
+}
+
+/* ---------- setup form ---------- */
+$('redirectUri').textContent=REDIRECT;
+$('clientId').value=store.get('ns.client')||'';
+$('setupForm').addEventListener('submit',e=>{
+  e.preventDefault(); const id=$('clientId').value.trim(); if(!id){ $('clientId').focus(); return; } beginAuth(id);
+});
+
+/* ---------- wall mode: hide the cursor, keep the screen awake ---------- */
+let idleTimer; const wake=()=>{ document.body.classList.remove('idle'); clearTimeout(idleTimer); idleTimer=setTimeout(()=>document.body.classList.add('idle'),3000); };
+['mousemove','touchstart','keydown'].forEach(ev=>addEventListener(ev,wake,{passive:true})); wake();
+/* night dimming: full brightness 07:00–19:00, easing down to 22% darker by 22:00 and overnight;
+   darker again after 20 minutes with nothing playing. Turn off with ?dim=off */
+let quietSince = performance.now();
+function dimLevel(){
+  if(params.get('dim')==='off') return 0;
+  const d=new Date(), h=d.getHours()+d.getMinutes()/60;
+  let lvl = h>=7 && h<19 ? 0 : h>=19 && h<22 ? (h-19)/3*0.22 : 0.22;
+  if(S.playing) quietSince = performance.now();
+  else if(performance.now()-quietSince > 20*60*1000) lvl = Math.min(0.4, lvl + 0.15);
+  return lvl;
+}
+function applyDim(){ $('dimmer').style.opacity = dimLevel().toFixed(3); }
+applyDim(); setInterval(applyDim, 30000);
+async function keepAwake(){ try{ await navigator.wakeLock?.request('screen'); }catch(e){} }
+keepAwake(); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) keepAwake(); });
+/* optional: slide the record and title card together so the pair sits centred (off by default) */
+let shift=0; const SLIDE_CARD=false;   // the record stays put; set true to slide the pair to centre when stopped
+function setShift(px){ shift=px; document.documentElement.style.setProperty('--shift',px+'px'); }
+function centerCard(){
+  if(!SLIDE_CARD || !document.body.classList.contains('stopped') || innerWidth<=860 || view){ setShift(0); return; }
+  const left = document.querySelector('.platter').getBoundingClientRect().left - shift;
+  let right = 0;
+  for(const id of ['tKicker','tTitle','tArtist','tFacts']){
+    const r=document.createRange(); r.selectNodeContents($(id)); const b=r.getBoundingClientRect();
+    if(b.width) right=Math.max(right, b.right - shift);
+  }
+  setShift(Math.max(0, Math.round((innerWidth - right - left)/2)));
+}
+function sizeWords(){ const pr=document.querySelector('.platter').getBoundingClientRect(), rs=document.documentElement.style;
+  rs.setProperty('--hx',(pr.left+pr.width/2-shift)+'px'); rs.setProperty('--hy',(pr.top+pr.height/2)+'px'); rs.setProperty('--hs',(pr.width*2)+'px');
+  const h=document.querySelector('.platter').offsetHeight; if(h && innerWidth>860) document.documentElement.style.setProperty('--rec',h+'px'); else document.documentElement.style.removeProperty('--rec'); layoutLyrics(true); }
+addEventListener('resize',()=>{ sizeWords(); centerCard(); }); sizeWords(); document.fonts?.ready.then(sizeWords);
+
+/* ---------- boot ---------- */
+requestAnimationFrame(frame);
+(async()=>{
+  if(params.has('signout')){ ['ns.token','ns.refresh','ns.expires'].forEach(store.del); history.replaceState(null,'',REDIRECT); }
+  const code=params.get('code'), err=params.get('error');
+  if(err){ status('Spotify sign-in was cancelled ('+err+').'); history.replaceState(null,'',REDIRECT); }
+  if(code && LOCAL){
+    try{ await tokenRequest({grant_type:'authorization_code',code,redirect_uri:REDIRECT,client_id:store.get('ns.client'),code_verifier:store.get('ns.verifier')}); }
+    catch(e){ status(e.message); }
+    history.replaceState(null,'',REDIRECT + (view?'?view='+view:''));
+  }
+  const signedIn = store.get('ns.token')||store.get('ns.refresh');
+  const needsScope = signedIn && !(store.get('ns.scope')||'').includes('user-read-recently-played');
+  if(LOCAL && signedIn && !needsScope) startSpotify();
+  else { showSetup(); if(needsScope) $('setupNote').hidden=false; }
+})();
+})();
+</script>
