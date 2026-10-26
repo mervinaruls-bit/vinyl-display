@@ -42,13 +42,15 @@ body.idle{cursor:none}
   var(--wall,#151311);transition:background-color 4s ease}
 .field{position:absolute;left:-4%;top:-4%;width:108%;height:108%;
   opacity:0;transition:opacity 4s ease;pointer-events:none;
-  animation:swirl 80s ease-in-out infinite alternate;will-change:transform}
+  will-change:opacity}
 .field.on{opacity:var(--fieldop,.5)}
-@keyframes swirl{from{transform:translate(-1.2%,.8%) scale(1)}to{transform:translate(1.2%,-.8%) scale(1.05)}}
+@keyframes swirl{from{transform:translate3d(-1.5%,1%,0)}to{transform:translate3d(1.5%,-1%,0)}}
 body:not(.bg-drift) .halo{display:none}
+.field:not(.on){animation-play-state:paused}
+.field.gone{display:none}
 body.bg-drift .field{display:none}
 /* low, cloudy mottling like hand-finished plaster */
-.surface::after{content:"";position:absolute;inset:0;opacity:.5;mix-blend-mode:soft-light;
+.surface::after{content:none;display:none;position:absolute;inset:0;opacity:.5;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='1000' preserveAspectRatio='none'%3E%3Cfilter id='p' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0045' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='1600' height='1000' filter='url(%23p)'/%3E%3C/svg%3E");
   background-size:100% 100%;background-repeat:no-repeat}
 .halo{position:absolute;left:calc(var(--hx,30vw) + var(--shift,0px));top:var(--hy,50%);width:var(--hs,1200px);height:var(--hs,1200px);margin:calc(var(--hs,1200px) / -2) 0 0 calc(var(--hs,1200px) / -2);
@@ -65,10 +67,10 @@ body.bg-drift .field{display:none}
 @keyframes breathe{from{transform:scale(.97)}to{transform:scale(1.03)}}
 body:not(.bg-drift) .bgl{display:none}
 body.bg-drift .surface, body.bg-drift .halo{display:none}
-.grain{position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;
+.grain{position:absolute;inset:0;opacity:.05;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E")}
 /* a touch of the same grain on the record surface itself */
-.spin::after{content:"";position:absolute;inset:0;border-radius:50%;opacity:.06;mix-blend-mode:overlay;pointer-events:none;
+.spin::after{content:"";position:absolute;inset:0;border-radius:50%;opacity:.035;pointer-events:none;z-index:3;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
 /* evening dimming: the whole piece settles down at night and when nothing is playing */
 .dimmer{position:fixed;inset:0;z-index:8;pointer-events:none;background:#0a0908;opacity:0;transition:opacity 90s linear}
@@ -92,7 +94,17 @@ body.only-lyrics .deck{display:none}
   -webkit-mask:radial-gradient(circle, transparent 96.2%, #000 96.8%, #000 99.4%, transparent 100%);
           mask:radial-gradient(circle, transparent 96.2%, #000 96.8%, #000 99.4%, transparent 100%)}
 .spin{position:absolute;inset:0;border-radius:50%;overflow:hidden;will-change:transform}
-.spin img{position:absolute;inset:3.5%;width:93%;height:93%;border-radius:50%;object-fit:cover;max-width:none}
+.spin > img{position:absolute;inset:3.5%;width:93%;height:93%;border-radius:50%;object-fit:cover;max-width:none}
+/* the new cover is revealed by two half-discs turning clockwise; the image inside counter-turns so it stays put */
+.reveal{position:absolute;inset:3.5%;border-radius:50%;overflow:hidden;z-index:1}
+.win{position:absolute;top:0;width:50%;height:100%;overflow:hidden}
+.win.r{left:50%} .win.l{left:0}
+.rot{position:absolute;top:0;width:200%;height:100%;transform-origin:50% 50%;will-change:transform}
+.win.r .rot{left:-100%} .win.l .rot{left:0}
+.half{position:absolute;top:0;width:50%;height:100%;overflow:hidden}
+.win.r .half{left:0} .win.l .half{left:50%}
+.rimg{position:absolute;top:0;width:200%;height:100%;object-fit:cover;max-width:none;transform-origin:50% 50%;will-change:transform}
+.win.r .rimg{left:0} .win.l .rimg{left:-100%}
 .grooves{position:absolute;inset:0;border-radius:50%;
   background:
     radial-gradient(circle, transparent 90%, rgba(10,9,8,.18) 93.5%, transparent 96%),
@@ -101,8 +113,8 @@ body.only-lyrics .deck{display:none}
     radial-gradient(circle closest-side, transparent 75.6%, rgba(10,9,8,.22) 76.2%, transparent 76.9%),
     radial-gradient(circle closest-side, transparent 84.4%, rgba(10,9,8,.22) 85%, transparent 85.7%),
     radial-gradient(circle closest-side, transparent 11%, rgba(10,9,8,.16) 12%, rgba(10,9,8,.16) 16.5%, transparent 17.5%),
-    repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 1.6px, rgba(10,9,8,.075) 1.6px 2.3px);mix-blend-mode:multiply}
-.sheen{position:absolute;inset:0;border-radius:50%;pointer-events:none;mix-blend-mode:screen;
+    repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 1.6px, rgba(10,9,8,.075) 1.6px 2.3px);z-index:2}
+.sheen{position:absolute;inset:0;border-radius:50%;pointer-events:none;will-change:transform;
   background:
     radial-gradient(circle, rgba(255,255,255,.05) 0 6%, transparent 30%),
     radial-gradient(circle closest-side, transparent 58.1%, rgba(255,255,255,.05) 58.5%, transparent 59%),
@@ -117,15 +129,16 @@ body.only-lyrics .deck{display:none}
           mask:radial-gradient(circle, transparent 6%, #000 12%, #000 92%, transparent 97%)}
 .spindle{position:absolute;left:50%;top:50%;width:3.4%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
   background:radial-gradient(circle at 35% 35%, #8d8a86, #2c2a28 60%, #0c0b0a);box-shadow:0 0 0 5px rgba(10,9,8,.5), 2px 3px 4px rgba(8,7,6,.6)}
-.arm{position:absolute;right:-4%;top:-14.8%;width:44%;pointer-events:none;overflow:visible}
-.arm .swing{transform-box:view-box;transform-origin:156px 76px;transform:rotate(-36deg);transition:transform 1.6s cubic-bezier(.45,0,.2,1)}
-body.playing .arm .swing{transform:rotate(0deg)}
+.arm{position:absolute;right:-4%;top:-14.8%;width:44%;aspect-ratio:200/300;pointer-events:none}
+.arm svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.arm-swing{position:absolute;inset:0;transform-origin:78% 25.333%;transform:rotate(-36deg);transition:transform 1.6s cubic-bezier(.45,0,.2,1);will-change:transform}
+body.playing .arm-swing{transform:rotate(0deg)}
 
 
 .meta{position:absolute;top:calc(100% + clamp(18px,3vh,30px));left:0;right:0;text-align:center;display:grid;gap:6px;transition:opacity .9s ease}
 .meta.swap{opacity:0}
 /* a soft shadow keeps text readable over any album's light */
-.meta, .tcard, .liner, .lyrics{text-shadow:0 1px 2px rgba(10,9,8,.35), 0 2px 18px rgba(10,9,8,.55)}
+.meta, .tcard, .liner{text-shadow:0 1px 2px rgba(10,9,8,.35), 0 2px 18px rgba(10,9,8,.55)}
 body.stopped .meta{opacity:0}
 .tcard{position:absolute;inset:0 var(--rgap) 0 0;display:flex;flex-direction:column;justify-content:center;gap:clamp(10px,1.8vh,18px);
   opacity:0;transition:opacity 1.4s ease;pointer-events:none}
@@ -145,12 +158,12 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
 .lyrics{position:absolute;inset:0 var(--rgap) 0 0;overflow:hidden;transition:opacity 1.2s ease;
   -webkit-mask-image:linear-gradient(transparent, #000 22%, #000 78%, transparent);
           mask-image:linear-gradient(transparent, #000 22%, #000 78%, transparent)}
-.sheet{position:absolute;left:0;right:0;top:0;transition:transform 1.2s cubic-bezier(.22,.61,.36,1), opacity .7s ease}
+.sheet{position:absolute;left:0;right:0;top:0;transition:transform 1.2s cubic-bezier(.22,.61,.36,1), opacity .7s ease;will-change:transform}
 .sheet.fade{opacity:0}
-.line{font-size:clamp(21px,min(2.3vw,4vh),64px);font-weight:600;line-height:1.22;letter-spacing:-.01em;color:var(--dim);
-  padding:10px 0;opacity:.4;transition:color 1s ease,opacity 1s ease,transform 1.2s cubic-bezier(.22,.61,.36,1),filter 1s ease;transform-origin:left center;text-wrap:balance;filter:blur(.4px)}
-.line.past{opacity:.22;filter:blur(.8px)}
-.line.now{color:var(--paper);opacity:1;transform:scale(1.03);filter:none}
+.line{font-size:clamp(21px,min(2.3vw,4vh),64px);font-weight:600;line-height:1.22;letter-spacing:-.01em;color:var(--paper);
+  padding:10px 0;opacity:.32;transition:opacity 1s ease;text-wrap:balance}
+.line.past{opacity:.16}
+.line.now{opacity:1}
 .sheet.plain .line{opacity:.85;color:var(--paper);font-size:clamp(18px,2vw,26px)}
 
 .liner{position:absolute;inset:0 var(--rgap) 0 0;display:flex;flex-direction:column;justify-content:center;gap:clamp(12px,2vh,20px);transition:opacity 1.2s ease}
@@ -167,7 +180,7 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
 .ltime{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:clamp(14px,1.7vh,24px);max-width:62vh;
   font:400 clamp(12px,1.45vh,20px)/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
 .lbar{height:2px;background:rgba(236,230,220,.14);border-radius:2px;overflow:hidden}
-.lbar i{display:block;height:100%;width:0;background:var(--paper);opacity:.8}
+.lbar i{display:block;height:100%;width:100%;background:var(--paper);opacity:.8;transform-origin:left center;transform:scaleX(0)}
 .lnote{margin:0;font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);opacity:.7}
 
 .status{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:5;text-align:center;
@@ -195,13 +208,13 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
   .stage{transform:none;padding-bottom:120px}
   .unit{margin-bottom:80px}
 }
-@media (prefers-reduced-motion:reduce){ .sheet,.arm .swing,.line{transition:none} .bgl i,.halo,.sheen,.field{animation:none} }
+@media (prefers-reduced-motion:reduce){ .sheet,.arm-swing,.line{transition:none} .bgl i,.halo,.sheen,.field{animation:none} }
 </style>
 
 <div class="ambient" aria-hidden="true">
   <div class="surface"></div>
   <canvas class="field" id="fieldA" width="320" height="180"></canvas>
-  <canvas class="field" id="fieldB" width="320" height="180"></canvas>
+  <canvas class="field gone" id="fieldB" width="320" height="180"></canvas>
   <div class="halo" id="haloA"></div>
   <div class="halo" id="haloB"></div>
   <div class="bgl" id="bgA"><i></i><i></i><i></i></div>
@@ -216,13 +229,17 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
       <div class="platter">
         <div class="disc"></div>
         <div class="spin" id="spin">
-          <img id="artOld" alt="">
           <img id="art" alt="">
+          <div class="reveal" id="reveal" hidden>
+            <div class="win r"><div class="rot" id="rotR"><div class="half"><img class="rimg" id="rimgR" alt=""></div></div></div>
+            <div class="win l"><div class="rot" id="rotL"><div class="half"><img class="rimg" id="rimgL" alt=""></div></div></div>
+          </div>
           <div class="grooves"></div>
         </div>
         <div class="sheen"></div>
         <div class="spindle"></div>
-        <svg class="arm" viewBox="0 0 200 300" aria-hidden="true">
+        <div class="arm">
+        <svg class="arm-base" viewBox="0 0 200 300" aria-hidden="true">
           <defs>
             <linearGradient id="gTube" x1="0" x2="1" y1="0" y2="0">
               <stop offset="0" stop-color="#0b0b0c"/><stop offset=".28" stop-color="#1f1f21"/>
@@ -268,9 +285,10 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
           </g>
           <circle cx="156" cy="76" r="15" fill="url(#gBearing)" stroke="rgba(255,255,255,.12)"/>
 
-          <!-- the moving arm -->
-          <g filter="url(#fShadow)">
-            <g class="swing">
+        </svg>
+        <div class="arm-swing" aria-hidden="true">
+          <svg viewBox="0 0 200 300">
+            <g filter="url(#fShadow)">
               <g transform="translate(156 76) rotate(13.9)">
                 <rect x="-2.5" y="-50" width="5" height="50" fill="url(#gTube)"/>
                 <rect x="-10" y="-42" width="20" height="5" rx="1" fill="#0b0b0c"/>
@@ -292,8 +310,9 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
                 </g>
               </g>
             </g>
-          </g>
-        </svg>
+          </svg>
+        </div>
+      </div>
       </div>
       <div class="meta" id="meta">
         <p class="track" id="track">Nothing on the platter</p>
@@ -392,7 +411,7 @@ function frame(now){
     if(t >= P.T){ angle = 0; vel = 0; stopPlan = null; }
   }
   $('spin').style.transform = `rotate(${angle}deg)`;
-  tickLyrics(); tickLiner(); tickSweep(now);
+  tickLyrics(); tickLiner(now); tickSweep(now);
   requestAnimationFrame(frame);
 }
 
@@ -422,10 +441,12 @@ function writeText(t){
   $('tFacts').textContent = [t.tag, t.album, t.year].filter(Boolean).join('  ·  ');
   if(document.body.classList.contains('stopped')) requestAnimationFrame(centerCard);
 }
-function tickLiner(){
-  const p = posMs();
-  $('lNow').textContent = fmt(p);
-  $('lProg').style.width = (S.durationMs ? Math.min(100, p/S.durationMs*100) : 0) + '%';
+let linerLast='', linerT=0;
+function tickLiner(now){
+  if(now - linerT < 250) return; linerT = now;          // four updates a second is plenty
+  const p = posMs(), txt = fmt(p);
+  if(txt !== linerLast){ linerLast = txt; $('lNow').textContent = txt; }
+  $('lProg').style.transform = `scaleX(${S.durationMs ? Math.min(1, p/S.durationMs).toFixed(4) : 0})`;
 }
 /* new cover sweeps in clockwise from 12 o'clock as the record turns; the old one goes with it */
 /* Changes are queued: quick skips settle for a moment, a sweep always finishes,
@@ -446,30 +467,40 @@ async function nextSweep(){
   const url = S.art, src = url || blank();
   const pre = await loadImg(src);
   if(S.art !== url){ busy=false; return nextSweep(); }        // changed again while loading
-  const cur=$('art'), old=$('artOld');
-  if(cur.src){ old.src = cur.src; try{ await old.decode(); }catch(e){} }
-  setMask(reduce ? 360 : 0);                                   // hide the new cover before it is swapped in
-  cur.crossOrigin='anonymous'; cur.src = pre ? src : blank();
-  try{ await cur.decode(); }catch(e){}
+  const cur=$('art'), newSrc = pre ? src : blank();
+  if(reduce || !cur.src){                                     // first record, or reduced motion: just place it
+    cur.crossOrigin='anonymous'; cur.src=newSrc; try{ await cur.decode(); }catch(e){}
+  } else {
+    for(const id of ['rimgR','rimgL']){ const im=$(id); im.crossOrigin='anonymous'; im.src=newSrc; }
+    try{ await $('rimgR').decode(); await $('rimgL').decode(); }catch(e){}
+    setReveal(0); $('reveal').hidden=false;
+  }
   shown = url;
   if(pre) applyPalette(pre);
   const t = snap(), m=$('meta');
   swapping = true; m.classList.add('swap');
   setTimeout(()=>{ writeText(t); m.classList.remove('swap'); swapping=false; flushLyrics(); }, 950);
-  if(reduce){ busy=false; return; }
-  sweepStart = performance.now();
+  if(reduce || $('reveal').hidden){ busy=false; return; }
+  sweepStart = performance.now(); sweepSrc = newSrc;
 }
-function setMask(deg){
-  const el=$('art');
-  if(deg>=360){ el.style.maskImage=el.style.webkitMaskImage=''; return; }
-  const m=`conic-gradient(from 0deg, #000 ${Math.max(0,deg-14)}deg, transparent ${deg}deg)`;
-  el.style.maskImage=m; el.style.webkitMaskImage=m;
+let sweepSrc='';
+function setReveal(deg){
+  const a=Math.min(180,Math.max(0,deg)), b=Math.min(180,Math.max(0,deg-180));
+  $('rotR').style.transform=`rotate(${a}deg)`; $('rimgR').style.transform=`rotate(${-a}deg)`;
+  $('rotL').style.transform=`rotate(${b}deg)`; $('rimgL').style.transform=`rotate(${-b}deg)`;
 }
 function tickSweep(now){
   if(sweepStart===null) return;
   const t=Math.min(1,(now-sweepStart)/SWEEP_MS), e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
-  setMask(e*374);
-  if(t>=1){ sweepStart=null; setMask(360); busy=false; if(S.art!==shown) settleT=setTimeout(nextSweep, 300); }
+  setReveal(e*360);
+  if(t>=1){
+    sweepStart=null; setReveal(360);
+    // hand over: the main image takes the new cover once it is ready, then the reveal layer is removed
+    const cur=$('art'); cur.crossOrigin='anonymous'; cur.src=sweepSrc;
+    (cur.decode ? cur.decode() : Promise.resolve()).catch(()=>{}).then(()=>{
+      requestAnimationFrame(()=>{ $('reveal').hidden=true; busy=false; if(S.art!==shown) settleT=setTimeout(nextSweep, 300); });
+    });
+  }
 }
 
 /* palette: the three strongest colour families in the cover, toned down for a wall glow */
@@ -510,7 +541,8 @@ function applyPalette(img){
   // the cover itself becomes the light on the wall
   const fn=$(next==='bgA'?'fieldA':'fieldB'), fo=$(next==='bgA'?'fieldB':'fieldA');
   try{ paintWall(fn, img, pk); }catch(e){ console.warn(e); }
-  fn.classList.add('on'); fo.classList.remove('on');
+  fn.classList.remove('gone'); fn.classList.add('on'); fo.classList.remove('on');
+  clearTimeout(fo._goneT); clearTimeout(fn._goneT); fo._goneT=setTimeout(()=>{ if(!fo.classList.contains('on')) fo.classList.add('gone'); }, 4300);
   bgFront=next;
   document.documentElement.style.setProperty('--glow',p[0]);
 }
