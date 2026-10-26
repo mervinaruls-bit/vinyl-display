@@ -235,6 +235,16 @@ body.sleeping .ambient{opacity:.35}
   .stage{transform:none;padding-bottom:120px}
   .unit{margin-bottom:80px}
 }
+ /* ---------- adaptive quality: lighter tiers for slower devices (set automatically, or ?quality=high|medium|low) ---------- */
+body.q1 .sheen{animation:none}
+body.q1 .grain, body.q1 .spin::after{display:none}
+body.q1 .meta, body.q1 .tcard, body.q1 .liner{text-shadow:0 1px 4px rgba(10,9,8,.7)}
+body.q1 .lyrics{-webkit-mask-image:none;mask-image:none}
+body.q1 .line{transition:opacity .6s ease}
+body.q2 .disc{box-shadow:0 0 0 1px rgba(236,230,220,.16), 10px 18px 36px rgba(8,7,6,.6)}
+body.q2 .field{transition:opacity 1.5s ease}
+body.q2 .sheen{background:conic-gradient(from 0deg, transparent 0deg 280deg, rgba(255,255,255,.08) 297deg, rgba(255,255,255,.18) 315deg, rgba(255,255,255,.08) 333deg, transparent 354deg)}
+body.q2 .arm-swing svg g{filter:none}
 @media (prefers-reduced-motion:reduce){ .sheet,.arm-swing,.line{transition:none} .bgl i,.halo,.sheen,.field{animation:none} }
 </style>
 
@@ -410,6 +420,12 @@ const SCOPES = 'user-read-currently-playing user-read-playback-state user-read-r
 
 /* one screen each on the final build: ?view=record / ?view=lyrics */
 const view = params.get('view');
+/* quality: start from what this device managed last time; step down if frames run slow */
+// each load tries one step better than last time, and steps back down within a few seconds if the device still struggles
+let quality = {high:0, medium:1, low:2}[params.get('quality')] ?? Math.max(0, (+(store.get('ns.quality')||0) || 0) - 1);
+const qualityLocked = params.has('quality');
+function applyQuality(){ document.body.classList.toggle('q1', quality>=1); document.body.classList.toggle('q2', quality>=2); }
+applyQuality();
 if(params.get('bg')==='drift') document.body.classList.add('bg-drift');
 document.body.classList.toggle('only-record', view==='record');
 document.body.classList.toggle('only-lyrics', view==='lyrics');
@@ -426,8 +442,19 @@ function status(msg){ $('status').textContent = msg || ''; }
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RPM = 6;
 let angle = 0, vel = 0, last = performance.now(), stopPlan = null;
+let perfAcc=0, perfN=0, perfSlow=0, perfT=0;
+function watchPerf(now, raw){
+  if(qualityLocked || quality>=2 || document.hidden || raw>250) return;   // ignore hidden tabs and one-off pauses
+  perfAcc+=raw; perfN++;
+  if(now-perfT < 2000) return;
+  const avg=perfAcc/perfN; perfAcc=0; perfN=0; perfT=now;
+  perfSlow = avg>26 ? perfSlow+1 : 0;                                       // below ~38 frames a second
+  if(perfSlow>=2){ quality++; perfSlow=0; applyQuality(); store.set('ns.quality',quality); }
+}
 function frame(now){
-  const dt = Math.min(.1,(now-last)/1000); last = now;
+  const raw = now-last;
+  const dt = Math.min(.1,raw/1000); last = now;
+  watchPerf(now, raw);
   if(S.playing && !reduce){
     stopPlan = null;
     vel += (RPM*6 - vel) * Math.min(1, dt*1.2);                // ease up to speed (rpm -> deg/s)
@@ -524,7 +551,7 @@ async function nextSweep(){
   const pre = await loadImg(src);
   if(S.art !== url){ busy=false; return nextSweep(); }        // changed again while loading
   const cur=$('art'), newSrc = pre ? src : blank(), tone = pre ? coverTone(pre) : 'none';
-  if(reduce || !cur.src){                                     // first record, or reduced motion: just place it
+  if(reduce || quality>=2 || !cur.src){                       // first record, reduced motion or low tier: just place it
     cur.crossOrigin='anonymous'; cur.src=newSrc; cur.style.filter=tone; try{ await cur.decode(); }catch(e){}
   } else {
     for(const id of ['rimgR','rimgL']){ const im=$(id); im.crossOrigin='anonymous'; im.src=newSrc; im.style.filter=tone; }
