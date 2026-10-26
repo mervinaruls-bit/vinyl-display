@@ -166,7 +166,7 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
 .saver #sTime{font-size:clamp(48px,min(9vw,16vh),220px);font-weight:600;letter-spacing:-.03em;line-height:1}
 .saver #sDate{font:500 clamp(12px,1.6vh,22px)/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
 body.sleeping .saver{opacity:1;transition-delay:2s}
-body.sleeping .stage{opacity:.1}
+body.sleeping .stage{opacity:0;transition:opacity 3s ease;pointer-events:none}
 body.sleeping .words, body.sleeping .meta{opacity:0!important;transition:opacity 3s ease}
 body.sleeping .ambient{opacity:.35}
 .ambient{transition:opacity 4s ease}
