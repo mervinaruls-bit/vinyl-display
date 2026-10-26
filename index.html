@@ -638,8 +638,16 @@ function drawWall(cv, img, a, style, seed, g){
   const cover=(size)=>{ const c=document.createElement('canvas'); c.width=c.height=size; c.getContext('2d').drawImage(img,0,0,size,size); return c; };
 
   if(style==='field'){
-    blur(12); if('filter' in x) x.filter='blur(12px) saturate(1.6)';
-    const s=BH*1.9; x.drawImage(cover(7), rx-s/2, ry-s/2, s, s);
+    // the cover's colours from its centre outwards, laid as even rings of light around the record (always centred)
+    const c=cover(32), d=c.getContext('2d').getImageData(0,0,32,32).data, bins=Array.from({length:6},()=>[0,0,0,0]);
+    for(let yy=0;yy<32;yy++) for(let xx=0;xx<32;xx++){
+      const rad=Math.min(5, Math.floor(Math.hypot(xx-15.5,yy-15.5)/22.6*6)), i=(yy*32+xx)*4, bn=bins[rad];
+      bn[0]+=d[i]; bn[1]+=d[i+1]; bn[2]+=d[i+2]; bn[3]++;
+    }
+    const R=Math.hypot(BW,BH), gr=x.createRadialGradient(rx,ry,rr*.9,rx,ry,R*.8);
+    bins.forEach((bn,k)=>{ if(!bn[3]) return; const [h,s2,l]=rgb2hsl(bn[0]/bn[3],bn[1]/bn[3],bn[2]/bn[3]);
+      gr.addColorStop(k/5, rgba(lit({h,s:s2,l}, Math.min(.6,Math.max(.28,l*1.1))), 1-k*.12)); });
+    blur(6); x.fillStyle=gr; x.fillRect(0,0,BW,BH);
   }
   else if(style==='projection'){
     // the cover itself, huge and duotoned like light from a projector
