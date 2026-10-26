@@ -497,17 +497,37 @@ function setArt(url){
 function loadImg(src){
   return new Promise(res=>{ const im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; });
 }
+/* exposure correction: every cover is eased into the same comfortable range, so glaring covers are
+   toned down, murky ones lifted and neon colours calmed. Baked in as a light filter on the record. */
+function coverTone(img){
+  try{
+    const c=document.createElement('canvas'); c.width=c.height=24; const x=c.getContext('2d'); x.drawImage(img,0,0,24,24);
+    const d=x.getImageData(0,0,24,24).data, n=d.length/4; let sy=0, syy=0, ss=0;
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255, y=.2126*r+.7152*g+.0722*b, mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+      sy+=y; syy+=y*y; ss+=mx?(mx-mn)/mx:0;
+    }
+    const Y=sy/n, sd=Math.sqrt(Math.max(0,syy/n-Y*Y)), sat=ss/n;
+    const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+    const bright=cl(Math.pow(.40/Math.max(Y,.04),.6), .72, 1.6);       // aim for a mid, easy-on-the-eye brightness
+    let contrast=cl(Math.pow(.22/Math.max(sd,.03),.35), .85, 1.12);     // soften harsh covers, give flat ones a little depth
+    if(Y<.22) contrast=Math.min(contrast, .78+Y);                      // very dark covers: lift the shadows out of pure black
+    const satur=sat>.5 ? cl(.5/sat,.72,1) : 1;                          // calm very saturated colours
+    return `brightness(${bright.toFixed(3)}) contrast(${contrast.toFixed(3)}) saturate(${satur.toFixed(3)})`;
+  }catch(e){ return 'none'; }
+}
+let sweepTone='none';
 async function nextSweep(){
   if(busy || S.art===shown) return;
   busy = true;
   const url = S.art, src = url || blank();
   const pre = await loadImg(src);
   if(S.art !== url){ busy=false; return nextSweep(); }        // changed again while loading
-  const cur=$('art'), newSrc = pre ? src : blank();
+  const cur=$('art'), newSrc = pre ? src : blank(), tone = pre ? coverTone(pre) : 'none';
   if(reduce || !cur.src){                                     // first record, or reduced motion: just place it
-    cur.crossOrigin='anonymous'; cur.src=newSrc; try{ await cur.decode(); }catch(e){}
+    cur.crossOrigin='anonymous'; cur.src=newSrc; cur.style.filter=tone; try{ await cur.decode(); }catch(e){}
   } else {
-    for(const id of ['rimgR','rimgL']){ const im=$(id); im.crossOrigin='anonymous'; im.src=newSrc; }
+    for(const id of ['rimgR','rimgL']){ const im=$(id); im.crossOrigin='anonymous'; im.src=newSrc; im.style.filter=tone; }
     try{ await $('rimgR').decode(); await $('rimgL').decode(); }catch(e){}
     setReveal(0); $('reveal').hidden=false;
   }
@@ -517,7 +537,7 @@ async function nextSweep(){
   swapping = true; m.classList.add('swap');
   setTimeout(()=>{ writeText(t); m.classList.remove('swap'); swapping=false; flushLyrics(); }, 950);
   if(reduce || $('reveal').hidden){ busy=false; return; }
-  sweepStart = performance.now(); sweepSrc = newSrc;
+  sweepStart = performance.now(); sweepSrc = newSrc; sweepTone = tone;
 }
 let sweepSrc='';
 function setReveal(deg){
@@ -532,7 +552,7 @@ function tickSweep(now){
   if(t>=1){
     sweepStart=null; setReveal(360);
     // hand over: the main image takes the new cover once it is ready, then the reveal layer is removed
-    const cur=$('art'); cur.crossOrigin='anonymous'; cur.src=sweepSrc;
+    const cur=$('art'); cur.crossOrigin='anonymous'; cur.src=sweepSrc; cur.style.filter=sweepTone;
     (cur.decode ? cur.decode() : Promise.resolve()).catch(()=>{}).then(()=>{
       requestAnimationFrame(()=>{ $('reveal').hidden=true; busy=false; if(S.art!==shown) settleT=setTimeout(nextSweep, 300); });
     });
