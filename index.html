@@ -9,7 +9,7 @@
   --room:#100e0d;        /* wall behind the frame */
   --vinyl:#0e0e0f;       /* record black, kept off true black so the LCD doesn't glow grey around it */
   --paper:#ece6dc;       /* lyric text */
-  --dim:#8a8279;         /* past/future lyric lines, captions */
+  --dim:#b3aa9e;         /* small labels: light enough to read over any album colour */
   --glow:#c86a3c;        /* replaced live by the album's colour */
   --display:"Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
   --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -147,9 +147,11 @@ body.stopped .lyrics, body.stopped .liner{opacity:0!important}
 .tk{margin:0 0 clamp(4px,1vh,16px);font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
 .ttitle{margin:0;font-size:clamp(44px,min(5.8vw,10vh),160px);font-weight:800;line-height:1.02;letter-spacing:-.025em;text-wrap:balance;overflow-wrap:anywhere}
 .tartist{margin:0;font-size:clamp(20px,min(2.2vw,3.9vh),56px);font-weight:400;color:var(--paper);opacity:.72}
-.tclock{margin-top:clamp(18px,4.5vh,56px);display:flex;align-items:baseline;gap:clamp(10px,1.4vw,20px);color:var(--paper);opacity:.55;font-variant-numeric:tabular-nums}
-.tclock #tTime{font-size:clamp(26px,min(3.2vw,5.6vh),88px);font-weight:600;letter-spacing:-.02em}
-.tclock #tDate{font:500 clamp(11px,1.4vh,18px)/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.tclock{align-self:flex-start;margin-top:clamp(16px,3.4vh,42px);padding-top:clamp(12px,2vh,22px);border-top:1px solid rgba(236,230,220,.22);
+  display:flex;align-items:baseline;gap:.9em;font:500 clamp(12px,1.45vh,20px)/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--paper);opacity:.85;font-variant-numeric:tabular-nums}
+.tclock #tTime{font-weight:600;letter-spacing:.1em}
+.tclock #tDate::before{content:"·";margin-right:.9em;opacity:.6}
 /* screensaver: after a long rest the piece fades back and a slow-wandering clock takes over */
 .saver{position:fixed;inset:0;z-index:7;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity 3s ease}
 .saver-in{display:grid;justify-items:center;gap:clamp(8px,1.4vh,16px);color:var(--paper);opacity:.5;font-variant-numeric:tabular-nums;
